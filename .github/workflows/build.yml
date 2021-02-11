@@ -1,4 +1,4 @@
-name: Build Jar
+name: Build executables
 on: [push, pull_request]
 jobs:
   build:

@@ -30,6 +30,6 @@
     "assets": [
       "node_modules/figlet/fonts/big.flf"
     ],
-    "targets": [ "node10-win-x64", "node10-macos-x64, node10-linux-x64" ]
+    "targets": [ "node10-win-x64", "node10-macos-x64", "node10-linux-x64" ]
   }
 }
