@@ -1,4 +1,6 @@
 const fetch = require('node-fetch');
+const fs = require('fs');
+const FormData = require('form-data');
 
 module.exports = {
   authenticate_user: async (username, password, host) => {
@@ -88,16 +90,20 @@ module.exports = {
     }
   },
   add_resource: async (cookie, host, exp, subject, datatype, file) => {
+    const formData = new FormData();
+    formData.append('file', fs.createReadStream(file));
     const requestOptions = {
       method: 'PUT',
       headers: {
         cookie: `JSESSIONID=${cookie}`,
       },
       redirect: 'follow',
+      body: formData,
     };
+
     try {
-      const response = await fetch(`${host}data/experiments/${exp}/resources/${exp}/files/${file}`, requestOptions);
-      // console.log(response.json())
+      const response = await fetch(`${host}data/projects/TRACKFA/subjects/${subject}/experiments/${exp}/resources/${exp}/files/${file}`, requestOptions);
+      console.log(await response.text());
       return !!response.ok;
     } catch (error) {
       console.log(error);

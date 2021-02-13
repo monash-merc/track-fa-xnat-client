@@ -147,10 +147,11 @@ const run = async () => {
           } else {
             // handle this
           }
-          // attach resource
-          // const resourceCreated =
-          // await fetchData.add_resource(sessionId, host, fileType, subject, '', file);
         }
+        // attach resource
+        console.log(`uploading file ${file}`);
+        const resourceCreated = await fetchData.add_resource(sessionId, host, fileType, subject, '', file);
+        console.log(resourceCreated);
       }
     // read all files in a folder
     } else if (elem === 'Pre-Processed') {
