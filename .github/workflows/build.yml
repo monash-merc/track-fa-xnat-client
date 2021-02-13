@@ -15,4 +15,4 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm install
       - run: npm install -g pkg
-      - run: pkg .
+      - run: pkg --debug .
