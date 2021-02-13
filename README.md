@@ -1,0 +1,1 @@
+![Build executables](https://github.com/manishkumr/track-fa-xnat-client/workflows/Build%20executables/badge.svg)
