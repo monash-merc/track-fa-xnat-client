@@ -16,3 +16,4 @@ jobs:
       - run: npm install
       - run: npm install -g pkg
       - run: pkg --debug .
+      - run: pwd
