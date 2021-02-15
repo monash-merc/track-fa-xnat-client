@@ -51,8 +51,14 @@ async function runProcessedData(processedList, sessionId, host, dryRun) {
     const subjectExist = await fetchData.check_subjects(sessionId, host, subject);
     if (subjectExist) {
       console.log(chalk.yellow(`Found subject with id ${subject}`));
-    } else {
+    } else if (!subjectExist && !dryRun) {
       // create subject
+      // subject will be created while creating experiment
+      const subjectCreated = await fetchData.create_subjects(sessionId, host, subject);
+      if (subjectCreated) {
+        console.log(`Created subject ${subject}`);
+      }
+    } else if (!subjectExist && dryRun) {
       subjectToCreate.push(subject);
     }
     // check if experiment exist
@@ -61,7 +67,7 @@ async function runProcessedData(processedList, sessionId, host, dryRun) {
     // create experiment
     if (expExist) {
       console.log(chalk.yellow(`Found exp with label ${fileType}`));
-    } else if (dryRun) {
+    } else if (dryRun && !expExist) {
       expToCreate.push(fileType);
     } else {
       console.log(chalk.red(`No exp with label ${fileType} found for subject ${subject}`));
@@ -80,11 +86,17 @@ async function runProcessedData(processedList, sessionId, host, dryRun) {
       if (!resourceExist) {
         fileToUpload.push(file);
       }
-    } else {
+    } else if (!dryRun) {
       // attach resource
-      console.log(`uploading file ${file}`);
+      const fileUpoadStatus = new Spinner(`uploading file ${file}....`);
+      fileUpoadStatus.start();
       const resourceCreated = await fetchData.add_resource(sessionId, host, fileType, subject, '', file);
-      console.log(resourceCreated);
+      fileUpoadStatus.stop();
+      if (resourceCreated) {
+        console.log(chalk.green(`${file} uploaded successfully`));
+      } else {
+        console.log(chalk.red('Something went wrong...'));
+      }
     }
   }
   returnObj.set('subject_create', subjectToCreate);
@@ -189,10 +201,9 @@ const run = async () => {
       // ask user if he wants to continue
 
       const userResponse = await inquirer.askContinue();
-      console.log(userResponse);
       if (userResponse) {
         // upload
-        console.log('uploading');
+        await runProcessedData(processedList, sessionId, host, false);
       } else {
         return 0;
       }

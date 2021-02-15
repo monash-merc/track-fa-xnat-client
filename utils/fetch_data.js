@@ -55,6 +55,23 @@ module.exports = {
       return error;
     }
   },
+  create_subjects: async (cookie, host, subject) => {
+    const requestOptions = {
+      method: 'PUT',
+      headers: {
+        cookie: `JSESSIONID=${cookie}`,
+      },
+      redirect: 'follow',
+    };
+    try {
+      const response = await fetch(`${host}data/projects/TRACKFA/subjects/${subject}?format=json`, requestOptions);
+      // console.log(response.json())
+      return !!response.ok;
+    } catch (error) {
+      console.log(error);
+      return error;
+    }
+  },
   check_experiments: async (cookie, host, exp, subject) => {
     const requestOptions = {
       method: 'GET',
