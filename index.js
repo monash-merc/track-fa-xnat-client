@@ -36,6 +36,63 @@ console.log(
   ),
 );
 
+async function runProcessedData(processedList, sessionId, host, dryRun) {
+  const returnObj = new Map();
+  const subjectToCreate = [];
+  const expToCreate = [];
+  const fileToUpload = [];
+  // eslint-disable-next-line no-plusplus
+  for (let i = 0; i < processedList.length; i++) {
+    const file = processedList[i];
+    const fileSplitArr = file.split('_');
+    const subject = fileSplitArr[1];
+    const fileType = fileSplitArr[2];
+    // check if subject exist
+    const subjectExist = await fetchData.check_subjects(sessionId, host, subject);
+    if (subjectExist) {
+      console.log(chalk.yellow(`Found subject with id ${subject}`));
+    } else {
+      // create subject
+      subjectToCreate.push(subject);
+    }
+    // check if experiment exist
+    const expExist = await fetchData.check_experiments(sessionId, host, fileType, subject);
+
+    // create experiment
+    if (expExist) {
+      console.log(chalk.yellow(`Found exp with label ${fileType}`));
+    } else if (dryRun) {
+      expToCreate.push(fileType);
+    } else {
+      console.log(chalk.red(`No exp with label ${fileType} found for subject ${subject}`));
+      console.log(chalk.green(`Creating exp with label ${fileType} `));
+      const expCreated = await fetchData.create_experiment(sessionId, host, fileType, subject, 'ProcessedData');
+      if (expCreated) {
+        console.log(`Created Processed Data experiment with label ${fileType}`);
+      } else {
+        // handle this
+      }
+    }
+    // attach resource
+    if (dryRun) {
+      // check if resource exist
+      const resourceExist = await fetchData.get_resource(sessionId, host, fileType, subject);
+      if (!resourceExist) {
+        fileToUpload.push(file);
+      }
+    } else {
+      // attach resource
+      console.log(`uploading file ${file}`);
+      const resourceCreated = await fetchData.add_resource(sessionId, host, fileType, subject, '', file);
+      console.log(resourceCreated);
+    }
+  }
+  returnObj.set('subject_create', subjectToCreate);
+  returnObj.set('exp_create', expToCreate);
+  returnObj.set('resource_upload', fileToUpload);
+  return returnObj;
+}
+
 const run = async () => {
   // check if credentials exist in store
   const conf = new Configstore('credentials');
@@ -106,7 +163,7 @@ const run = async () => {
       processedList.push(file);
     }
     if (fileType.startsWith('PRE')) {
-      // add to processed list
+      // add to pre processed list
       preProcessedList.push(file);
     }
   });
@@ -119,43 +176,29 @@ const run = async () => {
       await sleep(1000);
       // find list of processed data to upload
       ProcessedFileReadStatus.stop();
-      console.log(processedList);
-      // eslint-disable-next-line no-plusplus
-      for (let i = 0; i < processedList.length; i++) {
-        const file = processedList[i];
-        const fileSplitArr = file.split('_');
-        const subject = fileSplitArr[1];
-        const fileType = fileSplitArr[2];
-        // check if subject exist
-        const subjectExist = await fetchData.check_subjects(sessionId, host, subject);
-        if (subjectExist) {
-          console.log(chalk.yellow(`Found subject with id ${subject}`));
-        } else {
-          // create subject
-        }
-        // check if experiment exist
-        const expExist = await fetchData.check_experiments(sessionId, host, fileType);
-        if (expExist) {
-          console.log(chalk.yellow(`Found exp with label ${fileType}`));
-        } else {
-          // create experiment
-          console.log(chalk.red(`No exp with label ${fileType} found for subject ${subject}`));
-          console.log(chalk.green(`Creating exp with label ${fileType} `));
-          const expCreated = await fetchData.create_experiment(sessionId, host, fileType, subject, 'ProcessedData');
-          if (expCreated) {
-            console.log(`Created Processed Data experiment with label ${fileType}`);
-          } else {
-            // handle this
-          }
-        }
-        // attach resource
-        console.log(`uploading file ${file}`);
-        const resourceCreated = await fetchData.add_resource(sessionId, host, fileType, subject, '', file);
-        console.log(resourceCreated);
+      const dataObj = await runProcessedData(processedList, sessionId, host, true);
+      const subjectToCreate = dataObj.get('subject_create');
+      const expToCreate = dataObj.get('exp_create');
+      const fileToUpload = dataObj.get('resource_upload');
+      console.log(chalk.green(`This run will create following ${subjectToCreate.length} subjects`));
+      console.log(chalk.green(`    ${subjectToCreate} `));
+      console.log(chalk.green(`This run will create following ${expToCreate.length} experiments`));
+      console.log(chalk.green(`    ${expToCreate} `));
+      console.log(chalk.green(`This run will upload  following ${fileToUpload.length} files`));
+      console.log(chalk.green(`    ${fileToUpload} `));
+      // ask user if he wants to continue
+
+      const userResponse = await inquirer.askContinue();
+      console.log(userResponse);
+      if (userResponse) {
+        // upload
+        console.log('uploading');
+      } else {
+        return 0;
       }
     // read all files in a folder
     } else if (elem === 'Pre-Processed') {
-      const PreProcessedFileReadStatus = new Spinner('looking for processed data to upload, please wait...');
+      const PreProcessedFileReadStatus = new Spinner('looking for pre-processed data to upload, please wait...');
       PreProcessedFileReadStatus.start();
       await sleep(1000);
       PreProcessedFileReadStatus.stop();
@@ -165,6 +208,7 @@ const run = async () => {
 
     }
   }
+  return 0;
 };
 
 run();

@@ -110,4 +110,21 @@ module.exports = {
       return error;
     }
   },
+  get_resource: async (cookie, host, exp, subject) => {
+    const requestOptions = {
+      method: 'PUT',
+      headers: {
+        cookie: `JSESSIONID=${cookie}`,
+      },
+      redirect: 'follow',
+    };
+
+    try {
+      const response = await fetch(`${host}data/projects/TRACKFA/subjects/${subject}/experiments/${exp}/resources/`, requestOptions);
+      return !!response.ok;
+    } catch (error) {
+      console.log(error);
+      return error;
+    }
+  },
 };
