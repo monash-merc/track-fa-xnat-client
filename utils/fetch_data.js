@@ -38,6 +38,22 @@ module.exports = {
       return error;
     }
   },
+  get_all_subjects: async (cookie, host, project) => {
+    const requestOptions = {
+      method: 'GET',
+      headers: {
+        cookie: `JSESSIONID=${cookie}`,
+      },
+      redirect: 'follow',
+    };
+    try {
+      const response = await fetch(`${host}data/projects/${project}/subjects?format=json`, requestOptions);
+      return await response.json();
+    } catch (error) {
+      console.log(error);
+      return error;
+    }
+  },
   check_subjects: async (cookie, host, subject) => {
     const requestOptions = {
       method: 'GET',

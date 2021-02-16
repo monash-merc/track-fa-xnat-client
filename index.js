@@ -141,6 +141,16 @@ const run = async () => {
   const methodType = await inquirer.askMethodType();
   if (methodType.DataType === 'Download Data') {
     const dataType = await inquirer.askDataType('download');
+    //ask project
+    const status = new Spinner('Getting XNAT project, please wait...');
+    status.start();
+    await sleep(1000);
+    const allProjects = await fetchData.get_all_projects(sessionId, host);
+    status.stop();
+    const selectedProject = await inquirer.askProject(allProjects);
+    // ask subject
+    const subjects = await fetchData.get_all_subjects(sessionId, host, selectedProject.project);
+    console.log(subjects);
     return 0;
   }
   if (methodType.DataType === 'Upload Data') {
