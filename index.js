@@ -127,136 +127,142 @@ const run = async () => {
   }
   // authenticate user
   const sessionId = await fetchData.authenticate_user(username, password, host);
-  if (sessionId) {
-    console.log(chalk.green('Authentication OK'));
-  } else {
-    console.log(chalk.red('Authentication Failed..Please check your credentials'));
-  }
-  const dataType = await inquirer.askDataType();
-  console.log(dataType);
-  // get list of project
-  const status = new Spinner('Getting XNAT project, please wait...');
-  status.start();
   function sleep(ms) {
     return new Promise((resolve) => {
       setTimeout(resolve, ms);
     });
   }
-  await sleep(1000);
-  const allProjects = await fetchData.get_all_projects(sessionId, host);
-  status.stop();
-  // prompt user  to select a project
-  // eslint-disable-next-line no-unused-vars
-  const selectedProject = await inquirer.askProject(allProjects);
-  // get list of file to upload
-  const fileReadStatus = new Spinner('Reading directory, please wait...');
-  fileReadStatus.start();
-  await sleep(1000);
-  const filteredFileList = [];
+  if (sessionId) {
+    console.log(chalk.green('Authentication OK'));
+  } else {
+    console.log(chalk.red('Authentication Failed..Please check your credentials'));
+  }
+  // ask upload or download
+  const methodType = await inquirer.askMethodType();
+  if (methodType.DataType === 'Download Data') {
+    const dataType = await inquirer.askDataType('download');
+    return 0;
+  }
+  if (methodType.DataType === 'Upload Data') {
+    const dataType = await inquirer.askDataType('upload');
+    const status = new Spinner('Getting XNAT project, please wait...');
+    status.start();
+    await sleep(1000);
+    const allProjects = await fetchData.get_all_projects(sessionId, host);
+    status.stop();
+    // prompt user  to select a project
+    // eslint-disable-next-line no-unused-vars
+    const selectedProject = await inquirer.askProject(allProjects);
+    // get list of file to upload
+    const fileReadStatus = new Spinner('Reading directory, please wait...');
+    fileReadStatus.start();
+    await sleep(1000);
+    const filteredFileList = [];
 
-  try {
-    const fileList = await fs.readdir(files.getCurrentDirectoryBase());
-    fileList.forEach((file) => {
-      if (file.startsWith('TRACKFA')) {
-        filteredFileList.push(file);
+    try {
+      const fileList = await fs.readdir(files.getCurrentDirectoryBase());
+      fileList.forEach((file) => {
+        if (file.startsWith('TRACKFA')) {
+          filteredFileList.push(file);
+        }
+      });
+    } catch (err) {
+      console.error(err);
+    }
+    // format for file name TRACKFA_UMN001_PREPROC01_QSM.zip
+    // iterate and get processed file
+    const processedList = [];
+    const preProcessedList = [];
+    filteredFileList.forEach((file) => {
+      const fileSplitArr = file.split('_');
+      const fileType = fileSplitArr[2];
+      if (fileType.startsWith('PRO')) {
+      // add to processed list
+        processedList.push(file);
+      }
+      if (fileType.startsWith('PRE')) {
+      // add to pre processed list
+        preProcessedList.push(file);
       }
     });
-  } catch (err) {
-    console.error(err);
-  }
-  // format for file name TRACKFA_UMN001_PREPROC01_QSM.zip
-  // iterate and get processed file
-  const processedList = [];
-  const preProcessedList = [];
-  filteredFileList.forEach((file) => {
-    const fileSplitArr = file.split('_');
-    const fileType = fileSplitArr[2];
-    if (fileType.startsWith('PRO')) {
-      // add to processed list
-      processedList.push(file);
-    }
-    if (fileType.startsWith('PRE')) {
-      // add to pre processed list
-      preProcessedList.push(file);
-    }
-  });
-  fileReadStatus.stop();
-  // eslint-disable-next-line no-restricted-syntax
-  for (const elem of dataType.DataType) {
-    if (elem === 'Processed') {
-      const ProcessedFileReadStatus = new Spinner('looking for processed data to upload, please wait...');
-      ProcessedFileReadStatus.start();
-      await sleep(1000);
-      // find list of processed data to upload
-      ProcessedFileReadStatus.stop();
-      const dataObj = await processedFiles(processedList, sessionId, host, true, 'ProcessedData');
-      const subjectToCreate = dataObj.get('subject_create');
-      const expToCreate = dataObj.get('exp_create');
-      const fileToUpload = dataObj.get('resource_upload');
-      if (subjectToCreate.length > 0) {
-        console.log(chalk.green(`This run will create following ${subjectToCreate.length} subjects`));
-        console.log(chalk.green(`    ${subjectToCreate} `));
-      }
-      if (expToCreate.length > 0) {
-        console.log(chalk.green(`This run will create following ${expToCreate.length} experiments`));
-        console.log(chalk.green(`    ${expToCreate} `));
-      }
-      if (fileToUpload.length > 0) {
-        console.log(chalk.green(`This run will upload  following ${fileToUpload.length} files`));
-        console.log(chalk.green(`    ${fileToUpload} `));
-      }
-      if (subjectToCreate.length === 0 || expToCreate.length === 0 || fileToUpload.length === 0) {
-        console.log(chalk.red('No new processed data found in current directory'));
-      }
-
-      // ask user if he wants to continue
-      if (subjectToCreate.length > 0 || expToCreate.length > 0 || fileToUpload.length > 0) {
-        const userResponse = await inquirer.askContinue();
-        if (userResponse) {
-        // upload
-          await processedFiles(processedList, sessionId, host, false, 'ProcessedData');
-        } else {
-          return 0;
+    fileReadStatus.stop();
+    // eslint-disable-next-line no-restricted-syntax
+    for (const elem of dataType.DataType) {
+      if (elem === 'Processed') {
+        const ProcessedFileReadStatus = new Spinner('looking for processed data to upload, please wait...');
+        ProcessedFileReadStatus.start();
+        await sleep(1000);
+        // find list of processed data to upload
+        ProcessedFileReadStatus.stop();
+        const dataObj = await processedFiles(processedList, sessionId, host, true, 'ProcessedData');
+        const subjectToCreate = dataObj.get('subject_create');
+        const expToCreate = dataObj.get('exp_create');
+        const fileToUpload = dataObj.get('resource_upload');
+        if (subjectToCreate.length > 0) {
+          console.log(chalk.green(`This run will create following ${subjectToCreate.length} subjects`));
+          console.log(chalk.green(`    ${subjectToCreate} `));
         }
-      }
-
-    // read all files in a folder
-    } else if (elem === 'Pre-Processed') {
-      const PreProcessedFileReadStatus = new Spinner('looking for pre-processed data to upload, please wait...');
-      PreProcessedFileReadStatus.start();
-      await sleep(1000);
-      PreProcessedFileReadStatus.stop();
-      const dataObj = await processedFiles(preProcessedList, sessionId, host, true, 'PreProcessedData');
-      const subjectToCreate = dataObj.get('subject_create');
-      const expToCreate = dataObj.get('exp_create');
-      const fileToUpload = dataObj.get('resource_upload');
-      if (subjectToCreate.length > 0) {
-        console.log(chalk.green(`This run will create following ${subjectToCreate.length} subjects`));
-        console.log(chalk.green(`    ${subjectToCreate} `));
-      }
-      if (expToCreate.length > 0) {
-        console.log(chalk.green(`This run will create following ${expToCreate.length} experiments`));
-        console.log(chalk.green(`    ${expToCreate} `));
-      }
-      if (fileToUpload.length > 0) {
-        console.log(chalk.green(`This run will upload  following ${fileToUpload.length} files`));
-        console.log(chalk.green(`    ${fileToUpload} `));
-      }
-      if (subjectToCreate.length === 0 || expToCreate.length === 0 || fileToUpload.length === 0) {
-        console.log(chalk.red('No new pre-processed data found in current directory'));
-      }
-      if (subjectToCreate.length > 0 || expToCreate.length > 0 || fileToUpload.length > 0) {
-        const userResponse = await inquirer.askContinue();
-        if (userResponse) {
-        // upload
-          await processedFiles(preProcessedList, sessionId, host, false, 'PreProcessedData');
-        } else {
-          return 0;
+        if (expToCreate.length > 0) {
+          console.log(chalk.green(`This run will create following ${expToCreate.length} experiments`));
+          console.log(chalk.green(`    ${expToCreate} `));
         }
-      }
-    } else {
+        if (fileToUpload.length > 0) {
+          console.log(chalk.green(`This run will upload  following ${fileToUpload.length} files`));
+          console.log(chalk.green(`    ${fileToUpload} `));
+        }
+        if (subjectToCreate.length === 0 || expToCreate.length === 0 || fileToUpload.length === 0) {
+          console.log(chalk.red('No new processed data found in current directory'));
+        }
+
+        // ask user if he wants to continue
+        if (subjectToCreate.length > 0 || expToCreate.length > 0 || fileToUpload.length > 0) {
+          const userResponse = await inquirer.askContinue();
+          if (userResponse) {
+            // upload
+            await processedFiles(processedList, sessionId, host, false, 'ProcessedData');
+          } else {
+            return 0;
+          }
+        }
+
+        // read all files in a folder
+      } else if (elem === 'Pre-Processed') {
+        const PreProcessedFileReadStatus = new Spinner('looking for pre-processed data to upload, please wait...');
+        PreProcessedFileReadStatus.start();
+        await sleep(1000);
+        PreProcessedFileReadStatus.stop();
+        const dataObj = await processedFiles(preProcessedList, sessionId, host, true, 'PreProcessedData');
+        const subjectToCreate = dataObj.get('subject_create');
+        const expToCreate = dataObj.get('exp_create');
+        const fileToUpload = dataObj.get('resource_upload');
+        if (subjectToCreate.length > 0) {
+          console.log(chalk.green(`This run will create following ${subjectToCreate.length} subjects`));
+          console.log(chalk.green(`    ${subjectToCreate} `));
+        }
+        if (expToCreate.length > 0) {
+          console.log(chalk.green(`This run will create following ${expToCreate.length} experiments`));
+          console.log(chalk.green(`    ${expToCreate} `));
+        }
+        if (fileToUpload.length > 0) {
+          console.log(chalk.green(`This run will upload  following ${fileToUpload.length} files`));
+          console.log(chalk.green(`    ${fileToUpload} `));
+        }
+        if (subjectToCreate.length === 0 || expToCreate.length === 0 || fileToUpload.length === 0) {
+          console.log(chalk.red('No new pre-processed data found in current directory'));
+        }
+        if (subjectToCreate.length > 0 || expToCreate.length > 0 || fileToUpload.length > 0) {
+          const userResponse = await inquirer.askContinue();
+          if (userResponse) {
+            // upload
+            await processedFiles(preProcessedList, sessionId, host, false, 'PreProcessedData');
+          } else {
+            return 0;
+          }
+        }
+      } else {
       // TODO raw data
 
+      }
     }
   }
   return 0;
