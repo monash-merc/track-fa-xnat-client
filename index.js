@@ -36,14 +36,14 @@ console.log(
   ),
 );
 
-async function runProcessedData(processedList, sessionId, host, dryRun) {
+async function processedFiles(fileList, sessionId, host, dryRun, datatype) {
   const returnObj = new Map();
   const subjectToCreate = [];
   const expToCreate = [];
   const fileToUpload = [];
   // eslint-disable-next-line no-plusplus
-  for (let i = 0; i < processedList.length; i++) {
-    const file = processedList[i];
+  for (let i = 0; i < fileList.length; i++) {
+    const file = fileList[i];
     const fileSplitArr = file.split('_');
     const subject = fileSplitArr[1];
     const fileType = fileSplitArr[2];
@@ -72,9 +72,10 @@ async function runProcessedData(processedList, sessionId, host, dryRun) {
     } else {
       console.log(chalk.red(`No exp with label ${fileType} found for subject ${subject}`));
       console.log(chalk.green(`Creating exp with label ${fileType} `));
-      const expCreated = await fetchData.create_experiment(sessionId, host, fileType, subject, 'ProcessedData');
+      const expCreated = await fetchData
+        .create_experiment(sessionId, host, fileType, subject, datatype);
       if (expCreated) {
-        console.log(`Created Processed Data experiment with label ${fileType}`);
+        console.log(`Created ${datatype} Data experiment with label ${fileType}`);
       } else {
         // handle this
       }
@@ -188,34 +189,73 @@ const run = async () => {
       await sleep(1000);
       // find list of processed data to upload
       ProcessedFileReadStatus.stop();
-      const dataObj = await runProcessedData(processedList, sessionId, host, true);
+      const dataObj = await processedFiles(processedList, sessionId, host, true, 'ProcessedData');
       const subjectToCreate = dataObj.get('subject_create');
       const expToCreate = dataObj.get('exp_create');
       const fileToUpload = dataObj.get('resource_upload');
-      console.log(chalk.green(`This run will create following ${subjectToCreate.length} subjects`));
-      console.log(chalk.green(`    ${subjectToCreate} `));
-      console.log(chalk.green(`This run will create following ${expToCreate.length} experiments`));
-      console.log(chalk.green(`    ${expToCreate} `));
-      console.log(chalk.green(`This run will upload  following ${fileToUpload.length} files`));
-      console.log(chalk.green(`    ${fileToUpload} `));
-      // ask user if he wants to continue
-
-      const userResponse = await inquirer.askContinue();
-      if (userResponse) {
-        // upload
-        await runProcessedData(processedList, sessionId, host, false);
-      } else {
-        return 0;
+      if (subjectToCreate.length > 0) {
+        console.log(chalk.green(`This run will create following ${subjectToCreate.length} subjects`));
+        console.log(chalk.green(`    ${subjectToCreate} `));
       }
+      if (expToCreate.length > 0) {
+        console.log(chalk.green(`This run will create following ${expToCreate.length} experiments`));
+        console.log(chalk.green(`    ${expToCreate} `));
+      }
+      if (fileToUpload.length > 0) {
+        console.log(chalk.green(`This run will upload  following ${fileToUpload.length} files`));
+        console.log(chalk.green(`    ${fileToUpload} `));
+      }
+      if (subjectToCreate.length === 0 || expToCreate.length === 0 || fileToUpload.length === 0) {
+        console.log(chalk.red('No new processed data found in current directory'));
+      }
+
+      // ask user if he wants to continue
+      if (subjectToCreate.length > 0 || expToCreate.length > 0 || fileToUpload.length > 0) {
+        const userResponse = await inquirer.askContinue();
+        if (userResponse) {
+        // upload
+          await processedFiles(processedList, sessionId, host, false, 'ProcessedData');
+        } else {
+          return 0;
+        }
+      }
+
     // read all files in a folder
     } else if (elem === 'Pre-Processed') {
       const PreProcessedFileReadStatus = new Spinner('looking for pre-processed data to upload, please wait...');
       PreProcessedFileReadStatus.start();
       await sleep(1000);
       PreProcessedFileReadStatus.stop();
-      console.log(preProcessedList);
+      const dataObj = await processedFiles(preProcessedList, sessionId, host, true, 'PreProcessedData');
+      const subjectToCreate = dataObj.get('subject_create');
+      const expToCreate = dataObj.get('exp_create');
+      const fileToUpload = dataObj.get('resource_upload');
+      if (subjectToCreate.length > 0) {
+        console.log(chalk.green(`This run will create following ${subjectToCreate.length} subjects`));
+        console.log(chalk.green(`    ${subjectToCreate} `));
+      }
+      if (expToCreate.length > 0) {
+        console.log(chalk.green(`This run will create following ${expToCreate.length} experiments`));
+        console.log(chalk.green(`    ${expToCreate} `));
+      }
+      if (fileToUpload.length > 0) {
+        console.log(chalk.green(`This run will upload  following ${fileToUpload.length} files`));
+        console.log(chalk.green(`    ${fileToUpload} `));
+      }
+      if (subjectToCreate.length === 0 || expToCreate.length === 0 || fileToUpload.length === 0) {
+        console.log(chalk.red('No new pre-processed data found in current directory'));
+      }
+      if (subjectToCreate.length > 0 || expToCreate.length > 0 || fileToUpload.length > 0) {
+        const userResponse = await inquirer.askContinue();
+        if (userResponse) {
+        // upload
+          await processedFiles(preProcessedList, sessionId, host, false, 'PreProcessedData');
+        } else {
+          return 0;
+        }
+      }
     } else {
-      // raw data
+      // TODO raw data
 
     }
   }
