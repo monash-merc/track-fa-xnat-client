@@ -14,5 +14,5 @@ TRACK-FA XNAT client can be used to upload processed and pre-processed data to X
 This client assumes that the name of the zip file to be uploaded will be in the form PROJECTID_SUBJECTID_{PREPROC/PROC}_ProcessingSoftware.zip
 
 
-![alt text](https://github.com/manishkumr/track-fa-xnat-client/tree/master/docs/images/upload_xnat.gif "Upload to XNAT")
+![](docs/images/upload_xnat.gif)
 
