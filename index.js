@@ -141,8 +141,8 @@ const run = async () => {
   const methodType = await inquirer.askMethodType();
   if (methodType.DataType === 'Download Data') {
     const dataType = await inquirer.askDataType('download');
-    //ask project
-    const status = new Spinner('Getting XNAT project, please wait...');
+    // ask project
+    let status = new Spinner('Getting XNAT project, please wait...');
     status.start();
     await sleep(1000);
     const allProjects = await fetchData.get_all_projects(sessionId, host);
@@ -150,7 +150,59 @@ const run = async () => {
     const selectedProject = await inquirer.askProject(allProjects);
     // ask subject
     const subjects = await fetchData.get_all_subjects(sessionId, host, selectedProject.project);
-    console.log(subjects);
+    const selectedSubjects = await inquirer.askSubjects(subjects);
+    // ask experiments
+    const expListObject = [];
+    // eslint-disable-next-line no-restricted-syntax
+    for (const elem of dataType.DataType) {
+      // eslint-disable-next-line no-restricted-syntax
+      for (const subj of selectedSubjects.subject) {
+        if (elem === 'Processed') {
+        // get processed experiments
+          status = new Spinner('Finding processed data, please wait...');
+          status.start();
+          await sleep(1000);
+          const processedExp = await fetchData.get_experiments(sessionId, host, selectedProject.project, subj, 'data:ProcessedData');
+          expListObject.push(processedExp.ResultSet.Result[0]);
+          status.stop();
+        }
+        if (elem === 'Pre-Processed') {
+        // get processed experiments
+          status = new Spinner('Finding pre-processed data, please wait...');
+          status.start();
+          await sleep(1000);
+          const preProcessedExp = await fetchData.get_experiments(sessionId, host, selectedProject.project, subj, 'data:PreProcessedData');
+          expListObject.push(preProcessedExp.ResultSet.Result[0]);
+          status.stop();
+        }
+      }
+    }
+    const selectedExps = await inquirer.askexperiments(expListObject);
+    // download resources
+    const resourceToDownload = [];
+    // eslint-disable-next-line no-restricted-syntax
+    for (const exp of selectedExps.experiments) {
+      // list resources
+      const resources = await fetchData.get_resources(sessionId, host, exp);
+      resourceToDownload.push(resources.ResultSet.Result[0]);
+    }
+    // ask resource to Download
+    const selectedFiles = await inquirer.askResourceToDownload(resourceToDownload);
+    // download file
+    // const downloadStatus = new Spinner('Downloading files, please wait...');
+    // downloadStatus.start();
+    // eslint-disable-next-line no-restricted-syntax
+    for (const file of selectedFiles.files) {
+      // list resources
+      // eslint-disable-next-line no-unused-vars
+      const downloadFileStatus = new Spinner(`Downloading file ${file}, please wait...\n`);
+      downloadFileStatus.start();
+      // eslint-disable-next-line no-unused-vars
+      const rsStatus = await fetchData.download_file(sessionId, host, file).then(() => {
+        downloadFileStatus.stop();
+      });
+    }
+    // downloadStatus.stop();
     return 0;
   }
   if (methodType.DataType === 'Upload Data') {

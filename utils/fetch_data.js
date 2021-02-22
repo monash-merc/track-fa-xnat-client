@@ -1,6 +1,7 @@
 const fetch = require('node-fetch');
 const fs = require('fs');
 const FormData = require('form-data');
+const chalk = require('chalk');
 
 module.exports = {
   authenticate_user: async (username, password, host) => {
@@ -105,6 +106,22 @@ module.exports = {
       return error;
     }
   },
+  get_experiments: async (cookie, host, project, subject, expType) => {
+    const requestOptions = {
+      method: 'GET',
+      headers: {
+        cookie: `JSESSIONID=${cookie}`,
+      },
+      redirect: 'follow',
+    };
+    try {
+      const response = await fetch(`${host}data/projects/${project}/subjects/${subject}/experiments/?xsiType=${expType}&format=json`, requestOptions);
+      return await response.json();
+    } catch (error) {
+      console.log(error);
+      return error;
+    }
+  },
   create_experiment: async (cookie, host, exp, subject, datatype) => {
     const requestOptions = {
       method: 'PUT',
@@ -155,6 +172,51 @@ module.exports = {
     try {
       const response = await fetch(`${host}data/projects/TRACKFA/subjects/${subject}/experiments/${exp}/resources/`, requestOptions);
       return !!response.ok;
+    } catch (error) {
+      console.log(error);
+      return error;
+    }
+  },
+  get_resources: async (cookie, host, exp) => {
+    const requestOptions = {
+      method: 'GET',
+      headers: {
+        cookie: `JSESSIONID=${cookie}`,
+      },
+      redirect: 'follow',
+    };
+
+    try {
+      const response = await fetch(`${host}data/experiments/${exp}/files`, requestOptions);
+      return await response.json();
+    } catch (error) {
+      console.log(error);
+      return error;
+    }
+  },
+  // eslint-disable-next-line consistent-return
+  download_file: async (cookie, host, file) => {
+    const fileSplit = file.split('/');
+    const fileName = fileSplit[fileSplit.length - 1];
+    const requestOptions = {
+      method: 'GET',
+      headers: {
+        cookie: `JSESSIONID=${cookie}`,
+      },
+      redirect: 'follow',
+    };
+    try {
+      // const fileInfo = null;
+      const response = await fetch(`${host}${file.substring(1)}`, requestOptions);
+      const fileStream = fs.createWriteStream(fileName);
+      return await new Promise((resolve, reject) => {
+        response.body.pipe(fileStream);
+        response.body.on('error', reject);
+        fileStream.on('finish', () => {
+          console.log(chalk.green(`File ${fileName} downloaded to ${process.cwd()}`));
+          resolve();
+        });
+      });
     } catch (error) {
       console.log(error);
       return error;
