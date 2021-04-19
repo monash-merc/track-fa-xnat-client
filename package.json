@@ -14,6 +14,7 @@
   "dependencies": {
     "@octokit/auth-basic": "^1.4.8",
     "@octokit/rest": "^18.1.0",
+    "adm-zip": "^0.5.5",
     "axios": "^0.21.1",
     "chalk": "^4.1.0",
     "clear": "^0.1.0",

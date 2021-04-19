@@ -6,6 +6,7 @@ const clear = require('clear');
 const figlet = require('figlet');
 const Configstore = require('configstore');
 const fs = require('mz/fs');
+const AdmZip = require('adm-zip');
 const files = require('./lib/file');
 const inquirer = require('./lib/xnat-credentials');
 const fetchData = require('./utils/fetch_data');
@@ -105,10 +106,9 @@ async function processedFiles(fileList, sessionId, host, dryRun, datatype) {
   returnObj.set('resource_upload', fileToUpload);
   return returnObj;
 }
-
+const conf = new Configstore('credentials');
 const run = async () => {
   // check if credentials exist in store
-  const conf = new Configstore('credentials');
   let username = conf.get('username');
   let password = conf.get('password');
   let host = conf.get('host');
@@ -138,7 +138,15 @@ const run = async () => {
     console.log(chalk.red('Authentication Failed..Please check your credentials'));
   }
   // ask upload or download
-  const methodType = await inquirer.askMethodType();
+  let methodType = null;
+  if (!conf.get('method')) {
+    methodType = await inquirer.askMethodType();
+    console.log(`You have selected to ${conf.get('method')} data`);
+  } else {
+    methodType = {};
+    methodType.DataType = conf.get('method');
+    console.log(`You have selected to ${conf.get('method')}`);
+  }
   if (methodType.DataType === 'Download Data') {
     const dataType = await inquirer.askDataType('download');
     // ask project
@@ -206,15 +214,23 @@ const run = async () => {
     return 0;
   }
   if (methodType.DataType === 'Upload Data') {
-    const dataType = await inquirer.askDataType('upload');
-    const status = new Spinner('Getting XNAT project, please wait...');
-    status.start();
-    await sleep(1000);
-    const allProjects = await fetchData.get_all_projects(sessionId, host);
-    status.stop();
-    // prompt user  to select a project
-    // eslint-disable-next-line no-unused-vars
-    const selectedProject = await inquirer.askProject(allProjects);
+    let dataType = {};
+    if (!conf.get('data_type')) {
+      dataType = await inquirer.askDataType('upload');
+    } else {
+      dataType.DataType = conf.get('data_type');
+    }
+    if (!conf.get('project')) {
+      const status = new Spinner('Getting XNAT project, please wait...');
+      status.start();
+      await sleep(1000);
+      const allProjects = await fetchData.get_all_projects(sessionId, host);
+      status.stop();
+      // prompt user  to select a project
+      // eslint-disable-next-line no-unused-vars
+      const selectedProject = await inquirer.askProject(allProjects);
+    }
+
     // get list of file to upload
     const fileReadStatus = new Spinner('Reading directory, please wait...');
     fileReadStatus.start();
@@ -224,14 +240,65 @@ const run = async () => {
     try {
       const fileList = await fs.readdir(files.getCurrentDirectoryBase());
       fileList.forEach((file) => {
-        if (file.startsWith('TRACKFA')) {
+        if ((file.startsWith('TRACKFA_PROC') && file.endsWith('zip'))
+            || (file.startsWith('TRACKFA_PREPROC') && file.endsWith('zip'))) {
           filteredFileList.push(file);
         }
       });
     } catch (err) {
       console.error(err);
     }
-    // format for file name TRACKFA_UMN001_PREPROC01_QSM.zip
+    // format for zip file name TRACKFA_PROC01_BrainMorph_BrainT1_FreeSurfer_Aachen_24Mar2020.zip
+    // unzip file and verify content
+    const extractToFolderList = [];
+    filteredFileList.forEach((file) => {
+      const visitNumberString = String(file.split('_')[1]);
+      const visitNumber = visitNumberString.match(/\d+/g);
+      const piplineName = file.split('.')[0].split(/TRACKFA_[A-z]+[0-9]+_/)[1];
+      console.log(visitNumber);
+      const zip = new AdmZip(file);
+      // extract this zip file
+      const extractToFolder = `./${file.replace('.zip', '')}_extracted`;
+      try {
+        zip.extractAllTo(extractToFolder, true);
+        extractToFolderList.push(extractToFolder);
+      } catch (e) {
+        console.log(`cannot extract file from provided zip file:${file}`);
+      }
+      console.log(extractToFolderList);
+      extractToFolderList.forEach((folder) => {
+        fs.readdirSync(folder).forEach(((subFolder) => {
+          console.log(subFolder);
+          const subjectId = subFolder.split('_')[1];
+          // rename subfolder
+          fs.renameSync(`${folder}/${subFolder}`, `${folder}/TRACKFA_${subjectId}_PROC${visitNumber}_${piplineName}`);
+          // zip renamed folder
+        }));
+      });
+      // zip renamed folders
+      extractToFolderList.forEach((folder) => {
+        const subFolders = fs.readdirSync(folder);
+        subFolders.forEach((elem) => {
+          console.log(elem);
+          const folderToZip = new AdmZip();
+          folderToZip.addLocalFolder(`${folder}/${elem}`);
+          // create a subfolder if not exist
+          const folderName = './upload_folder';
+          try {
+            if (!fs.existsSync(folderName)) {
+              fs.mkdirSync(folderName);
+            }
+          } catch (err) {
+            console.log(err);
+          }
+          folderToZip.writeZip(`upload_folder/${elem}.zip`)
+        });
+      });
+      // delete extracted folders
+    });
+    extractToFolderList.forEach((folder) => {
+      fs.rmdirSync(folder, { recursive: true });
+    });
     // iterate and get processed file
     const processedList = [];
     const preProcessedList = [];
