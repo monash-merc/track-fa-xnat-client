@@ -150,9 +150,8 @@ module.exports = {
       redirect: 'follow',
       body: formData,
     };
-
     try {
-      const response = await fetch(`${host}data/projects/TRACKFA/subjects/${subject}/experiments/${exp}/resources/${exp}/files/${file}`, requestOptions);
+      const response = await fetch(`${host}data/projects/TRACKFA/subjects/${subject}/experiments/${exp}/resources/${exp}/files/${file.split('/')[1]}?format=zip`, requestOptions);
       console.log(await response.text());
       return !!response.ok;
     } catch (error) {

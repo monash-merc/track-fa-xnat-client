@@ -48,6 +48,7 @@ async function processedFiles(fileList, sessionId, host, dryRun, datatype) {
     const fileSplitArr = file.split('_');
     const subject = fileSplitArr[1];
     const fileType = fileSplitArr[2];
+    const expName = `${subject}_${fileType}`;
     // check if subject exist
     const subjectExist = await fetchData.check_subjects(sessionId, host, subject);
     if (subjectExist) {
@@ -63,20 +64,20 @@ async function processedFiles(fileList, sessionId, host, dryRun, datatype) {
       subjectToCreate.push(subject);
     }
     // check if experiment exist
-    const expExist = await fetchData.check_experiments(sessionId, host, fileType, subject);
+    const expExist = await fetchData.check_experiments(sessionId, host, expName, subject);
 
     // create experiment
     if (expExist) {
-      console.log(chalk.yellow(`Found exp with label ${fileType}`));
+      console.log(chalk.yellow(`Found exp with label ${expName}`));
     } else if (dryRun && !expExist) {
-      expToCreate.push(fileType);
+      expToCreate.push(expName);
     } else {
-      console.log(chalk.red(`No exp with label ${fileType} found for subject ${subject}`));
-      console.log(chalk.green(`Creating exp with label ${fileType} `));
+      console.log(chalk.red(`No exp with label ${expName} found for subject ${subject}`));
+      console.log(chalk.green(`Creating exp with label ${expName} `));
       const expCreated = await fetchData
-        .create_experiment(sessionId, host, fileType, subject, datatype);
+        .create_experiment(sessionId, host, expName, subject, datatype);
       if (expCreated) {
-        console.log(`Created ${datatype} Data experiment with label ${fileType}`);
+        console.log(`Created ${datatype} Data experiment with label ${expName}`);
       } else {
         // handle this
       }
@@ -84,7 +85,7 @@ async function processedFiles(fileList, sessionId, host, dryRun, datatype) {
     // attach resource
     if (dryRun) {
       // check if resource exist
-      const resourceExist = await fetchData.get_resource(sessionId, host, fileType, subject);
+      const resourceExist = await fetchData.get_resource(sessionId, host, expName, subject);
       if (!resourceExist) {
         fileToUpload.push(file);
       }
@@ -92,7 +93,7 @@ async function processedFiles(fileList, sessionId, host, dryRun, datatype) {
       // attach resource
       const fileUpoadStatus = new Spinner(`uploading file ${file}....`);
       fileUpoadStatus.start();
-      const resourceCreated = await fetchData.add_resource(sessionId, host, fileType, subject, '', file);
+      const resourceCreated = await fetchData.add_resource(sessionId, host, expName, subject, '', `upload_folder/${file}`);
       fileUpoadStatus.stop();
       if (resourceCreated) {
         console.log(chalk.green(`${file} uploaded successfully`));
@@ -248,6 +249,7 @@ const run = async () => {
     } catch (err) {
       console.error(err);
     }
+    fileReadStatus.stop();
     // format for zip file name TRACKFA_PROC01_BrainMorph_BrainT1_FreeSurfer_Aachen_24Mar2020.zip
     // unzip file and verify content
     const extractToFolderList = [];
@@ -255,7 +257,6 @@ const run = async () => {
       const visitNumberString = String(file.split('_')[1]);
       const visitNumber = visitNumberString.match(/\d+/g);
       const piplineName = file.split('.')[0].split(/TRACKFA_[A-z]+[0-9]+_/)[1];
-      console.log(visitNumber);
       const zip = new AdmZip(file);
       // extract this zip file
       const extractToFolder = `./${file.replace('.zip', '')}_extracted`;
@@ -265,12 +266,11 @@ const run = async () => {
       } catch (e) {
         console.log(`cannot extract file from provided zip file:${file}`);
       }
-      console.log(extractToFolderList);
       extractToFolderList.forEach((folder) => {
         fs.readdirSync(folder).forEach(((subFolder) => {
-          console.log(subFolder);
           const subjectId = subFolder.split('_')[1];
           // rename subfolder
+          console.log(`${chalk.yellow(`Renaming ${subFolder}`)} to ${chalk.green(`TRACKFA_${subjectId}_PROC${visitNumber}_${piplineName}`)}`);
           fs.renameSync(`${folder}/${subFolder}`, `${folder}/TRACKFA_${subjectId}_PROC${visitNumber}_${piplineName}`);
           // zip renamed folder
         }));
@@ -279,7 +279,6 @@ const run = async () => {
       extractToFolderList.forEach((folder) => {
         const subFolders = fs.readdirSync(folder);
         subFolders.forEach((elem) => {
-          console.log(elem);
           const folderToZip = new AdmZip();
           folderToZip.addLocalFolder(`${folder}/${elem}`);
           // create a subfolder if not exist
@@ -291,18 +290,19 @@ const run = async () => {
           } catch (err) {
             console.log(err);
           }
-          folderToZip.writeZip(`upload_folder/${elem}.zip`)
+          folderToZip.writeZip(`upload_folder/${elem}.zip`);
         });
       });
-      // delete extracted folders
     });
+    // delete extracted folders
     extractToFolderList.forEach((folder) => {
       fs.rmdirSync(folder, { recursive: true });
     });
     // iterate and get processed file
     const processedList = [];
     const preProcessedList = [];
-    filteredFileList.forEach((file) => {
+    const uploadFileList = await fs.readdir('./upload_folder/');
+    uploadFileList.forEach((file) => {
       const fileSplitArr = file.split('_');
       const fileType = fileSplitArr[2];
       if (fileType.startsWith('PRO')) {
