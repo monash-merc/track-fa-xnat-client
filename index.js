@@ -7,9 +7,40 @@ const figlet = require('figlet');
 const Configstore = require('configstore');
 const fs = require('mz/fs');
 const AdmZip = require('adm-zip');
+const yargs = require('yargs');
 const files = require('./lib/file');
 const inquirer = require('./lib/xnat-credentials');
 const fetchData = require('./utils/fetch_data');
+
+const options = yargs
+  .usage('Usage: -n <name>')
+  .command(['interactive', 'i'], 'Run in interactive mode', {}, () => { console.log('Running in interactive mode'); })
+  .command(['non-interactive', 'n'], 'Run in non-interactive mode',
+    () => yargs
+      .option('host', {
+        alias: 'h', describe: 'XNAT host URL', type: 'string', demandOption: true,
+      })
+      .option('username', {
+        alias: 'u', describe: 'XNAT username', type: 'string', demandOption: true,
+      })
+      .option('password', {
+        alias: 'p', describe: 'XNAT password', type: 'string', demandOption: true,
+      })
+      .option('method', {
+        alias: 'm', describe: 'Choose upload or Download', type: 'string', demandOption: true,
+      })
+      .option('data_type', {
+        alias: 'd', describe: 'Choose data type', type: 'string', demandOption: true,
+      })
+      .option('project', {
+        alias: 'o', describe: 'Choose project', type: 'string', demandOption: true,
+      }),
+    () => { console.log('Running in interactive mode'); })
+  .demandCommand()
+  .help()
+  .argv;
+const greeting = `Hello, ${options.name}!`;
+console.log(greeting);
 
 clear();
 console.log(
