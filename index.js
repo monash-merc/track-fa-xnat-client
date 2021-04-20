@@ -12,134 +12,9 @@ const files = require('./lib/file');
 const inquirer = require('./lib/xnat-credentials');
 const fetchData = require('./utils/fetch_data');
 
-const options = yargs
-  .usage('Usage: -n <name>')
-  .command(['interactive', 'i'], 'Run in interactive mode', {}, () => { console.log('Running in interactive mode'); })
-  .command(['non-interactive', 'n'], 'Run in non-interactive mode',
-    () => yargs
-      .option('host', {
-        alias: 'h', describe: 'XNAT host URL', type: 'string', demandOption: true,
-      })
-      .option('username', {
-        alias: 'u', describe: 'XNAT username', type: 'string', demandOption: true,
-      })
-      .option('password', {
-        alias: 'p', describe: 'XNAT password', type: 'string', demandOption: true,
-      })
-      .option('method', {
-        alias: 'm', describe: 'Choose upload or Download', type: 'string', demandOption: true,
-      })
-      .option('data_type', {
-        alias: 'd', describe: 'Choose data type', type: 'string', demandOption: true,
-      })
-      .option('project', {
-        alias: 'o', describe: 'Choose project', type: 'string', demandOption: true,
-      }),
-    () => { console.log('Running in interactive mode'); })
-  .demandCommand()
-  .help()
-  .argv;
-const greeting = `Hello, ${options.name}!`;
-console.log(greeting);
-
-clear();
-console.log(
-  chalk.yellow(
-    figlet.textSync('---------------------', { font: 'big', horizontalLayout: 'full' }),
-  ),
-);
-
-console.log(
-  chalk.yellow(
-    figlet.textSync('TRACK-FA-XNAT-CLIENT', { font: 'big', horizontalLayout: 'full' }),
-  ),
-);
-console.log(
-  chalk.green('A XNAT Client to upload and download Post-Processed or Processed data for TRACK-FA Project'),
-);
-console.log(
-  chalk.yellow(
-    figlet.textSync('---------------------', { font: 'big', horizontalLayout: 'full' }),
-  ),
-);
-console.log(
-  chalk.green(
-    `Current directory is: ${files.getCurrentDirectoryBase()}`,
-  ),
-);
-
-async function processedFiles(fileList, sessionId, host, dryRun, datatype) {
-  const returnObj = new Map();
-  const subjectToCreate = [];
-  const expToCreate = [];
-  const fileToUpload = [];
-  // eslint-disable-next-line no-plusplus
-  for (let i = 0; i < fileList.length; i++) {
-    const file = fileList[i];
-    const fileSplitArr = file.split('_');
-    const subject = fileSplitArr[1];
-    const fileType = fileSplitArr[2];
-    const expName = `${subject}_${fileType}`;
-    // check if subject exist
-    const subjectExist = await fetchData.check_subjects(sessionId, host, subject);
-    if (subjectExist) {
-      console.log(chalk.yellow(`Found subject with id ${subject}`));
-    } else if (!subjectExist && !dryRun) {
-      // create subject
-      // subject will be created while creating experiment
-      const subjectCreated = await fetchData.create_subjects(sessionId, host, subject);
-      if (subjectCreated) {
-        console.log(`Created subject ${subject}`);
-      }
-    } else if (!subjectExist && dryRun) {
-      subjectToCreate.push(subject);
-    }
-    // check if experiment exist
-    const expExist = await fetchData.check_experiments(sessionId, host, expName, subject);
-
-    // create experiment
-    if (expExist) {
-      console.log(chalk.yellow(`Found exp with label ${expName}`));
-    } else if (dryRun && !expExist) {
-      expToCreate.push(expName);
-    } else {
-      console.log(chalk.red(`No exp with label ${expName} found for subject ${subject}`));
-      console.log(chalk.green(`Creating exp with label ${expName} `));
-      const expCreated = await fetchData
-        .create_experiment(sessionId, host, expName, subject, datatype);
-      if (expCreated) {
-        console.log(`Created ${datatype} Data experiment with label ${expName}`);
-      } else {
-        // handle this
-      }
-    }
-    // attach resource
-    if (dryRun) {
-      // check if resource exist
-      const resourceExist = await fetchData.get_resource(sessionId, host, expName, subject);
-      if (!resourceExist) {
-        fileToUpload.push(file);
-      }
-    } else if (!dryRun) {
-      // attach resource
-      const fileUpoadStatus = new Spinner(`uploading file ${file}....`);
-      fileUpoadStatus.start();
-      const resourceCreated = await fetchData.add_resource(sessionId, host, expName, subject, '', `upload_folder/${file}`);
-      fileUpoadStatus.stop();
-      if (resourceCreated) {
-        console.log(chalk.green(`${file} uploaded successfully`));
-      } else {
-        console.log(chalk.red('Something went wrong...'));
-      }
-    }
-  }
-  returnObj.set('subject_create', subjectToCreate);
-  returnObj.set('exp_create', expToCreate);
-  returnObj.set('resource_upload', fileToUpload);
-  return returnObj;
-}
 const conf = new Configstore('credentials');
-const run = async () => {
+const run = async (options) => {
+  // console.log(options);
   // check if credentials exist in store
   let username = conf.get('username');
   let password = conf.get('password');
@@ -427,5 +302,136 @@ const run = async () => {
   }
   return 0;
 };
+const options = yargs
+  .usage('Usage: -n <name>')
+  .command(['interactive', 'i'], 'Run in interactive mode', {}, () => { console.log('Running in interactive mode'); })
+  .command(['non-interactive', 'n'], 'Run in non-interactive mode',
+    () => yargs
+      .option('host', {
+        alias: 'h', describe: 'XNAT host URL', type: 'string', demandOption: true,
+      })
+      .option('username', {
+        alias: 'u', describe: 'XNAT username', type: 'string', demandOption: true,
+      })
+      .option('password', {
+        alias: 'p', describe: 'XNAT password', type: 'string', demandOption: true,
+      })
+      .option('method', {
+        alias: 'm', describe: 'Choose upload or Download', choices: ['Upload Data', 'Download Data'], demandOption: true,
+      })
+      .option('data_type', {
+        alias: 'd', describe: 'Choose data type', choices: ['Processed', 'Pre-Processed', 'Raw'], demandOption: true,
+      })
+      .option('project', {
+        alias: 'o', describe: 'Choose project', type: 'string', demandOption: true,
+      }),
+    () => {
+      console.log('Running in non-interactive mode');
+      // run
+    })
+  .demandCommand()
+  .help()
+  .argv;
+const greeting = `Hello, ${options.name}!`;
+console.log(greeting);
 
-run();
+clear();
+console.log(
+  chalk.yellow(
+    figlet.textSync('---------------------', { font: 'big', horizontalLayout: 'full' }),
+  ),
+);
+
+console.log(
+  chalk.yellow(
+    figlet.textSync('TRACK-FA-XNAT-CLIENT', { font: 'big', horizontalLayout: 'full' }),
+  ),
+);
+console.log(
+  chalk.green('A XNAT Client to upload and download Post-Processed or Processed data for TRACK-FA Project'),
+);
+console.log(
+  chalk.yellow(
+    figlet.textSync('---------------------', { font: 'big', horizontalLayout: 'full' }),
+  ),
+);
+console.log(
+  chalk.green(
+    `Current directory is: ${files.getCurrentDirectoryBase()}`,
+  ),
+);
+
+async function processedFiles(fileList, sessionId, host, dryRun, datatype) {
+  const returnObj = new Map();
+  const subjectToCreate = [];
+  const expToCreate = [];
+  const fileToUpload = [];
+  // eslint-disable-next-line no-plusplus
+  for (let i = 0; i < fileList.length; i++) {
+    const file = fileList[i];
+    const fileSplitArr = file.split('_');
+    const subject = fileSplitArr[1];
+    const fileType = fileSplitArr[2];
+    const expName = `${subject}_${fileType}`;
+    // check if subject exist
+    const subjectExist = await fetchData.check_subjects(sessionId, host, subject);
+    if (subjectExist) {
+      console.log(chalk.yellow(`Found subject with id ${subject}`));
+    } else if (!subjectExist && !dryRun) {
+      // create subject
+      // subject will be created while creating experiment
+      const subjectCreated = await fetchData.create_subjects(sessionId, host, subject);
+      if (subjectCreated) {
+        console.log(`Created subject ${subject}`);
+      }
+    } else if (!subjectExist && dryRun) {
+      subjectToCreate.push(subject);
+    }
+    // check if experiment exist
+    const expExist = await fetchData.check_experiments(sessionId, host, expName, subject);
+
+    // create experiment
+    if (expExist) {
+      console.log(chalk.yellow(`Found exp with label ${expName}`));
+    } else if (dryRun && !expExist) {
+      expToCreate.push(expName);
+    } else {
+      console.log(chalk.red(`No exp with label ${expName} found for subject ${subject}`));
+      console.log(chalk.green(`Creating exp with label ${expName} `));
+      const expCreated = await fetchData
+        .create_experiment(sessionId, host, expName, subject, datatype);
+      if (expCreated) {
+        console.log(`Created ${datatype} Data experiment with label ${expName}`);
+      } else {
+        // handle this
+      }
+    }
+    // attach resource
+    if (dryRun) {
+      // check if resource exist
+      const resourceExist = await fetchData.get_resource(sessionId, host, expName, subject);
+      if (!resourceExist) {
+        fileToUpload.push(file);
+      }
+    } else if (!dryRun) {
+      // attach resource
+      const fileUpoadStatus = new Spinner(`uploading file ${file}....`);
+      fileUpoadStatus.start();
+      const resourceCreated = await fetchData.add_resource(sessionId, host, expName, subject, '', `upload_folder/${file}`);
+      fileUpoadStatus.stop();
+      if (resourceCreated) {
+        console.log(chalk.green(`${file} uploaded successfully`));
+      } else {
+        console.log(chalk.red('Something went wrong...'));
+      }
+    }
+  }
+  returnObj.set('subject_create', subjectToCreate);
+  returnObj.set('exp_create', expToCreate);
+  returnObj.set('resource_upload', fileToUpload);
+  return returnObj;
+}
+run(
+  options,
+);
+//run();
