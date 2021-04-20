@@ -14,11 +14,7 @@ module.exports = {
     };
     try {
       const response = await fetch(`${host}data/JSESSION`, requestOptions);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      } else {
-        return await response.text();
-      }
+      return response;
     } catch (e) {
       return (e);
     }

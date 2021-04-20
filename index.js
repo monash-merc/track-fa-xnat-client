@@ -11,49 +11,73 @@ const yargs = require('yargs');
 const files = require('./lib/file');
 const inquirer = require('./lib/xnat-credentials');
 const fetchData = require('./utils/fetch_data');
+const processedFiles = require('./utils/process_upload');
 
 const conf = new Configstore('credentials');
+// eslint-disable-next-line no-unused-vars
 const run = async (options) => {
-  // console.log(options);
+  const mode = options._[0] === 'i' ? 'interactive' : 'non-interactive';
   // check if credentials exist in store
-  let username = conf.get('username');
-  let password = conf.get('password');
-  let host = conf.get('host');
-  if (username && password && host) {
-    console.log(
-      chalk.yellow(`Found existing XNAT credentials at ${conf.path}`),
-    );
-  } else {
-    const credentials = await inquirer.askXNATCredentials();
-    conf.set('host', credentials.host);
-    conf.set('username', credentials.username);
-    conf.set('password', credentials.password);
-    host = conf.get('host');
+  let host; let username; let password;
+  if (mode === 'interactive') {
     username = conf.get('username');
     password = conf.get('password');
+    host = conf.get('host');
+    if (username && password && host) {
+      console.log(
+        chalk.yellow(`Found existing XNAT credentials at ${conf.path}`),
+      );
+    } else {
+      const credentials = await inquirer.askXNATCredentials();
+      conf.set('host', credentials.host);
+      conf.set('username', credentials.username);
+      conf.set('password', credentials.password);
+      host = conf.get('host');
+      username = conf.get('username');
+      password = conf.get('password');
+    }
+  }
+  if (mode === 'non-interactive') {
+    username = options.username;
+    password = options.password;
+    host = options.host;
   }
   // authenticate user
-  const sessionId = await fetchData.authenticate_user(username, password, host);
+  const response = await fetchData.authenticate_user(username, password, host);
   function sleep(ms) {
     return new Promise((resolve) => {
       setTimeout(resolve, ms);
     });
   }
-  if (sessionId) {
-    console.log(chalk.green('Authentication OK'));
+  let sessionId = null;
+  if (response.ok) {
+    // get sessionID
+    sessionId = await response.text();
   } else {
     console.log(chalk.red('Authentication Failed..Please check your credentials'));
+    return process.exit(1);
+  }
+  if (sessionId) {
+    console.log(chalk.green('Authentication OK'));
   }
   // ask upload or download
   let methodType = null;
-  if (!conf.get('method')) {
-    methodType = await inquirer.askMethodType();
-    console.log(`You have selected to ${conf.get('method')} data`);
-  } else {
-    methodType = {};
-    methodType.DataType = conf.get('method');
-    console.log(`You have selected to ${conf.get('method')}`);
+  if (mode === 'interactive') {
+    if (!conf.get('method')) {
+      methodType = await inquirer.askMethodType();
+      console.log(`You have selected to ${conf.get('method')} data`);
+    } else {
+      methodType = {};
+      methodType.DataType = conf.get('method');
+      console.log(`You have selected to ${conf.get('method')}`);
+    }
   }
+  if (mode === 'non-interactive') {
+    methodType = {};
+    methodType.DataType = options.method;
+    console.log(`You have selected to ${options.method}`);
+  }
+
   if (methodType.DataType === 'Download Data') {
     const dataType = await inquirer.askDataType('download');
     // ask project
@@ -122,22 +146,29 @@ const run = async (options) => {
   }
   if (methodType.DataType === 'Upload Data') {
     let dataType = {};
-    if (!conf.get('data_type')) {
-      dataType = await inquirer.askDataType('upload');
-    } else {
-      dataType.DataType = conf.get('data_type');
+    if (mode === 'interactive') {
+      if (!conf.get('data_type')) {
+        dataType = await inquirer.askDataType('upload');
+      } else {
+        dataType.DataType = conf.get('data_type');
+      }
     }
-    if (!conf.get('project')) {
-      const status = new Spinner('Getting XNAT project, please wait...');
-      status.start();
-      await sleep(1000);
-      const allProjects = await fetchData.get_all_projects(sessionId, host);
-      status.stop();
-      // prompt user  to select a project
-      // eslint-disable-next-line no-unused-vars
-      const selectedProject = await inquirer.askProject(allProjects);
+    if (mode === 'non-interactive') {
+      dataType.DataType = options.data_type;
     }
-
+    let selectedProject = null;
+    if (mode === 'interactive') {
+      if (!conf.get('project')) {
+        const status = new Spinner('Getting XNAT project, please wait...');
+        status.start();
+        await sleep(1000);
+        const allProjects = await fetchData.get_all_projects(sessionId, host);
+        status.stop();
+        // prompt user  to select a project
+        // eslint-disable-next-line no-unused-vars
+        selectedProject = await inquirer.askProject(allProjects);
+      }
+    }
     // get list of file to upload
     const fileReadStatus = new Spinner('Reading directory, please wait...');
     fileReadStatus.start();
@@ -229,7 +260,7 @@ const run = async (options) => {
         await sleep(1000);
         // find list of processed data to upload
         ProcessedFileReadStatus.stop();
-        const dataObj = await processedFiles(processedList, sessionId, host, true, 'ProcessedData');
+        const dataObj = await processedFiles.processed_files(processedList, sessionId, host, true, 'ProcessedData');
         const subjectToCreate = dataObj.get('subject_create');
         const expToCreate = dataObj.get('exp_create');
         const fileToUpload = dataObj.get('resource_upload');
@@ -250,14 +281,19 @@ const run = async (options) => {
         }
 
         // ask user if he wants to continue
-        if (subjectToCreate.length > 0 || expToCreate.length > 0 || fileToUpload.length > 0) {
-          const userResponse = await inquirer.askContinue();
-          if (userResponse) {
+        if (mode === 'interactive') {
+          if (subjectToCreate.length > 0 || expToCreate.length > 0 || fileToUpload.length > 0) {
+            const userResponse = await inquirer.askContinue();
+            if (userResponse.continue) {
             // upload
-            await processedFiles(processedList, sessionId, host, false, 'ProcessedData');
-          } else {
-            return 0;
+              await processedFiles.processed_files(processedList, sessionId, host, false, 'ProcessedData');
+            } else {
+              return process.exit(1);
+            }
           }
+        }
+        if (mode === 'non-interactive') {
+          await processedFiles.processed_files(processedList, sessionId, host, false, 'ProcessedData');
         }
 
         // read all files in a folder
@@ -266,7 +302,7 @@ const run = async (options) => {
         PreProcessedFileReadStatus.start();
         await sleep(1000);
         PreProcessedFileReadStatus.stop();
-        const dataObj = await processedFiles(preProcessedList, sessionId, host, true, 'PreProcessedData');
+        const dataObj = await processedFiles.processed_files(preProcessedList, sessionId, host, true, 'PreProcessedData');
         const subjectToCreate = dataObj.get('subject_create');
         const expToCreate = dataObj.get('exp_create');
         const fileToUpload = dataObj.get('resource_upload');
@@ -287,9 +323,10 @@ const run = async (options) => {
         }
         if (subjectToCreate.length > 0 || expToCreate.length > 0 || fileToUpload.length > 0) {
           const userResponse = await inquirer.askContinue();
+          console.log(userResponse);
           if (userResponse) {
             // upload
-            await processedFiles(preProcessedList, sessionId, host, false, 'PreProcessedData');
+            await processedFiles.processed_files(preProcessedList, sessionId, host, false, 'PreProcessedData');
           } else {
             return 0;
           }
@@ -303,7 +340,7 @@ const run = async (options) => {
   return 0;
 };
 const options = yargs
-  .usage('Usage: -n <name>')
+  .usage('Usage: Command <Options>')
   .command(['interactive', 'i'], 'Run in interactive mode', {}, () => { console.log('Running in interactive mode'); })
   .command(['non-interactive', 'n'], 'Run in non-interactive mode',
     () => yargs
@@ -317,10 +354,10 @@ const options = yargs
         alias: 'p', describe: 'XNAT password', type: 'string', demandOption: true,
       })
       .option('method', {
-        alias: 'm', describe: 'Choose upload or Download', choices: ['Upload Data', 'Download Data'], demandOption: true,
+        alias: 'm', describe: 'Choose upload or Download', type: 'string', choices: ['Upload Data', 'Download Data'], demandOption: true,
       })
       .option('data_type', {
-        alias: 'd', describe: 'Choose data type', choices: ['Processed', 'Pre-Processed', 'Raw'], demandOption: true,
+        alias: 'd', describe: 'Choose data type', type: 'array', choices: ['Processed', 'Pre-Processed', 'Raw'], demandOption: true,
       })
       .option('project', {
         alias: 'o', describe: 'Choose project', type: 'string', demandOption: true,
@@ -332,8 +369,6 @@ const options = yargs
   .demandCommand()
   .help()
   .argv;
-const greeting = `Hello, ${options.name}!`;
-console.log(greeting);
 
 clear();
 console.log(
@@ -361,77 +396,7 @@ console.log(
   ),
 );
 
-async function processedFiles(fileList, sessionId, host, dryRun, datatype) {
-  const returnObj = new Map();
-  const subjectToCreate = [];
-  const expToCreate = [];
-  const fileToUpload = [];
-  // eslint-disable-next-line no-plusplus
-  for (let i = 0; i < fileList.length; i++) {
-    const file = fileList[i];
-    const fileSplitArr = file.split('_');
-    const subject = fileSplitArr[1];
-    const fileType = fileSplitArr[2];
-    const expName = `${subject}_${fileType}`;
-    // check if subject exist
-    const subjectExist = await fetchData.check_subjects(sessionId, host, subject);
-    if (subjectExist) {
-      console.log(chalk.yellow(`Found subject with id ${subject}`));
-    } else if (!subjectExist && !dryRun) {
-      // create subject
-      // subject will be created while creating experiment
-      const subjectCreated = await fetchData.create_subjects(sessionId, host, subject);
-      if (subjectCreated) {
-        console.log(`Created subject ${subject}`);
-      }
-    } else if (!subjectExist && dryRun) {
-      subjectToCreate.push(subject);
-    }
-    // check if experiment exist
-    const expExist = await fetchData.check_experiments(sessionId, host, expName, subject);
-
-    // create experiment
-    if (expExist) {
-      console.log(chalk.yellow(`Found exp with label ${expName}`));
-    } else if (dryRun && !expExist) {
-      expToCreate.push(expName);
-    } else {
-      console.log(chalk.red(`No exp with label ${expName} found for subject ${subject}`));
-      console.log(chalk.green(`Creating exp with label ${expName} `));
-      const expCreated = await fetchData
-        .create_experiment(sessionId, host, expName, subject, datatype);
-      if (expCreated) {
-        console.log(`Created ${datatype} Data experiment with label ${expName}`);
-      } else {
-        // handle this
-      }
-    }
-    // attach resource
-    if (dryRun) {
-      // check if resource exist
-      const resourceExist = await fetchData.get_resource(sessionId, host, expName, subject);
-      if (!resourceExist) {
-        fileToUpload.push(file);
-      }
-    } else if (!dryRun) {
-      // attach resource
-      const fileUpoadStatus = new Spinner(`uploading file ${file}....`);
-      fileUpoadStatus.start();
-      const resourceCreated = await fetchData.add_resource(sessionId, host, expName, subject, '', `upload_folder/${file}`);
-      fileUpoadStatus.stop();
-      if (resourceCreated) {
-        console.log(chalk.green(`${file} uploaded successfully`));
-      } else {
-        console.log(chalk.red('Something went wrong...'));
-      }
-    }
-  }
-  returnObj.set('subject_create', subjectToCreate);
-  returnObj.set('exp_create', expToCreate);
-  returnObj.set('resource_upload', fileToUpload);
-  return returnObj;
-}
 run(
   options,
 );
-//run();
+// run();
