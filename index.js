@@ -191,9 +191,6 @@ const run = async (options) => {
     // unzip file and verify content
     const extractToFolderList = [];
     filteredFileList.forEach((file) => {
-      const visitNumberString = String(file.split('_')[1]);
-      const visitNumber = visitNumberString.match(/\d+/g);
-      const piplineName = file.split('.')[0].split(/TRACKFA_[A-z]+[0-9]+_/)[1];
       const zip = new AdmZip(file);
       // extract this zip file
       const extractToFolder = `./${file.replace('.zip', '')}_extracted`;
@@ -203,32 +200,37 @@ const run = async (options) => {
       } catch (e) {
         console.log(`cannot extract file from provided zip file:${file}`);
       }
-      extractToFolderList.forEach((folder) => {
-        fs.readdirSync(folder).forEach(((subFolder) => {
-          const subjectId = subFolder.split('_')[1];
-          // rename subfolder
-          console.log(`${chalk.yellow(`Renaming ${subFolder}`)} to ${chalk.green(`TRACKFA_${subjectId}_PROC${visitNumber}_${piplineName}`)}`);
-          fs.renameSync(`${folder}/${subFolder}`, `${folder}/TRACKFA_${subjectId}_PROC${visitNumber}_${piplineName}`);
-          // zip renamed folder
-        }));
-      });
-      // zip renamed folders
-      extractToFolderList.forEach((folder) => {
-        const subFolders = fs.readdirSync(folder);
-        subFolders.forEach((elem) => {
-          const folderToZip = new AdmZip();
-          folderToZip.addLocalFolder(`${folder}/${elem}`);
-          // create a subfolder if not exist
-          const folderName = './upload_folder';
-          try {
-            if (!fs.existsSync(folderName)) {
-              fs.mkdirSync(folderName);
-            }
-          } catch (err) {
-            console.log(err);
+    });
+    // rename
+    extractToFolderList.forEach((folder) => {
+      const visitNumberString = String(folder.split('_')[1]);
+      const dataTypeString = visitNumberString.match(/\D+/g);
+      const visitNumber = visitNumberString.match(/\d+/g);
+      const piplineName = folder.split(/TRACKFA_[A-z]+[0-9]+_/)[1].slice(0, -10);
+      fs.readdirSync(folder).forEach(((subFolder) => {
+        const subjectId = subFolder.split('_')[1];
+        // rename subfolder
+        console.log(`${chalk.yellow(`Renaming ${subFolder}`)} to ${chalk.green(`TRACKFA_${subjectId}_${dataTypeString}${visitNumber}_${piplineName}`)}`);
+        fs.renameSync(`${folder}/${subFolder}`, `${folder}/TRACKFA_${subjectId}_${dataTypeString}${visitNumber}_${piplineName}`);
+        // zip renamed folder
+      }));
+    });
+    // zip renamed folders
+    extractToFolderList.forEach((folder) => {
+      const subFolders = fs.readdirSync(folder);
+      subFolders.forEach((elem) => {
+        const folderToZip = new AdmZip();
+        folderToZip.addLocalFolder(`${folder}/${elem}`);
+        // create a subfolder if not exist
+        const folderName = './upload_folder';
+        try {
+          if (!fs.existsSync(folderName)) {
+            fs.mkdirSync(folderName);
           }
-          folderToZip.writeZip(`upload_folder/${elem}.zip`);
-        });
+        } catch (err) {
+          console.log(err);
+        }
+        folderToZip.writeZip(`upload_folder/${elem}.zip`);
       });
     });
     // delete extracted folders
@@ -251,6 +253,7 @@ const run = async (options) => {
         preProcessedList.push(file);
       }
     });
+    console.log(preProcessedList);
     fileReadStatus.stop();
     // eslint-disable-next-line no-restricted-syntax
     for (const elem of dataType.DataType) {
@@ -321,15 +324,20 @@ const run = async (options) => {
         if (subjectToCreate.length === 0 || expToCreate.length === 0 || fileToUpload.length === 0) {
           console.log(chalk.red('No new pre-processed data found in current directory'));
         }
-        if (subjectToCreate.length > 0 || expToCreate.length > 0 || fileToUpload.length > 0) {
-          const userResponse = await inquirer.askContinue();
-          console.log(userResponse);
-          if (userResponse) {
+
+        if (mode === 'interactive') {
+          if (subjectToCreate.length > 0 || expToCreate.length > 0 || fileToUpload.length > 0) {
+            const userResponse = await inquirer.askContinue();
+            if (userResponse.continue) {
             // upload
-            await processedFiles.processed_files(preProcessedList, sessionId, host, false, 'PreProcessedData');
-          } else {
-            return 0;
+              await processedFiles.processed_files(preProcessedList, sessionId, host, false, 'PreProcessedData');
+            } else {
+              return process.exit(1);
+            }
           }
+        }
+        if (mode === 'non-interactive') {
+          await processedFiles.processed_files(preProcessedList, sessionId, host, false, 'PreProcessedData');
         }
       } else {
       // TODO raw data
@@ -341,6 +349,7 @@ const run = async (options) => {
 };
 const options = yargs
   .usage('Usage: Command <Options>')
+  .example('n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Upload Data" -d "Pre-Processed" "Processed" -o TRACK-FA')
   .command(['interactive', 'i'], 'Run in interactive mode', {}, () => { console.log('Running in interactive mode'); })
   .command(['non-interactive', 'n'], 'Run in non-interactive mode',
     () => yargs

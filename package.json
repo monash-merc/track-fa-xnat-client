@@ -6,7 +6,7 @@
   "bin": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "eslint": "eslint -c .eslintrc.yml --ext .js index.js lib/ utils/"
+    "eslint": "eslint -c .eslintrc.yml --ext .js index.js lib/*.js utils/*.js"
   },
   "keywords": [],
   "author": "Manish Kumar",
