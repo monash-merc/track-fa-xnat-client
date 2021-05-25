@@ -60,6 +60,7 @@ async function getProject(mode, options, sessionId, host) {
 }
 
 async function downloadFiles(selectedFiles, sessionId, host) {
+  // eslint-disable-next-line no-restricted-syntax
   for (const file of selectedFiles.files) {
     // list resources
     // eslint-disable-next-line no-unused-vars
@@ -135,7 +136,7 @@ const run = async (options) => {
     const dataType = await getDataType(mode, options);
     // generate a map of pipeline name and visits based on dataType
     // ask project
-    let status = new Spinner('Getting XNAT project, please wait...');
+    const status = new Spinner('Getting XNAT project, please wait...');
     const selectedProject = await getProject(mode, options, sessionId, host, status);
     const processedExpList = await fetchData
       .get_all_experiments_by_data_type('data:ProcessedData', sessionId, host, selectedProject.project);
@@ -172,11 +173,6 @@ const run = async (options) => {
         selectedPreProcessedVisitIds.visit,
         preProcessedExpList.ResultSet.Result,
       );
-    // get resource for selected experiments
-    // eslint-disable-next-line no-restricted-syntax
-    for (const exp of matchedPreProcessedExpList) {
-      const resources = await fetchData.get_resources(sessionId, host, exp.ID);
-    }
     // ask pipeline name
     const pipeline = await inquirer.askPipeline();
     const matchedProcessedFiles = [];
