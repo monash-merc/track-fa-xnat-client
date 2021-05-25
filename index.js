@@ -11,9 +11,67 @@ const yargs = require('yargs');
 const files = require('./lib/file');
 const inquirer = require('./lib/xnat-credentials');
 const fetchData = require('./utils/fetch_data');
+const utils = require('./utils/utils');
 const processedFiles = require('./utils/process_upload');
 
 const conf = new Configstore('credentials');
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function getDataType(mode, options) {
+  let dataType = {};
+  if (mode === 'interactive') {
+    if (!conf.get('data_type')) {
+      dataType = await inquirer.askDataType('upload');
+    } else {
+      dataType.DataType = conf.get('data_type');
+    }
+  }
+  if (mode === 'non-interactive') {
+    dataType.DataType = options.data_type;
+  }
+  return dataType;
+}
+
+async function getProject(mode, options, sessionId, host) {
+  let selectedProject = {};
+  if (mode === 'interactive') {
+    if (!conf.get('project')) {
+      const status = new Spinner('Getting XNAT project, please wait...');
+      status.start();
+      await sleep(1000);
+      const allProjects = await fetchData.get_all_projects(sessionId, host);
+      status.stop();
+      // prompt user  to select a project
+      // eslint-disable-next-line no-unused-vars
+      selectedProject = await inquirer.askProject(allProjects);
+    } else {
+      selectedProject.project = conf.get('project');
+    }
+  }
+  if (mode === 'non-interactive') {
+    selectedProject.project = options.project;
+  }
+  return selectedProject;
+}
+
+async function downloadFiles(selectedFiles, sessionId, host) {
+  for (const file of selectedFiles.files) {
+    // list resources
+    // eslint-disable-next-line no-unused-vars
+    const downloadFileStatus = new Spinner(`Downloading file ${file}, please wait...\n`);
+    downloadFileStatus.start();
+    // eslint-disable-next-line no-unused-vars
+    const rsStatus = await fetchData.download_file(sessionId, host, file).then(() => {
+      downloadFileStatus.stop();
+    });
+  }
+}
+
 // eslint-disable-next-line no-unused-vars
 const run = async (options) => {
   const mode = options._[0] === 'i' ? 'interactive' : 'non-interactive';
@@ -44,11 +102,6 @@ const run = async (options) => {
   }
   // authenticate user
   const response = await fetchData.authenticate_user(username, password, host);
-  function sleep(ms) {
-    return new Promise((resolve) => {
-      setTimeout(resolve, ms);
-    });
-  }
   let sessionId = null;
   if (response.ok) {
     // get sessionID
@@ -79,68 +132,92 @@ const run = async (options) => {
   }
 
   if (methodType.DataType === 'Download Data') {
-    const dataType = await inquirer.askDataType('download');
+    const dataType = await getDataType(mode, options);
+    // generate a map of pipeline name and visits based on dataType
     // ask project
     let status = new Spinner('Getting XNAT project, please wait...');
-    status.start();
-    await sleep(1000);
-    const allProjects = await fetchData.get_all_projects(sessionId, host);
-    status.stop();
-    const selectedProject = await inquirer.askProject(allProjects);
-    // ask subject
-    const subjects = await fetchData.get_all_subjects(sessionId, host, selectedProject.project);
-    const selectedSubjects = await inquirer.askSubjects(subjects);
-    // ask experiments
-    const expListObject = [];
+    const selectedProject = await getProject(mode, options, sessionId, host, status);
+    const processedExpList = await fetchData
+      .get_all_experiments_by_data_type('data:ProcessedData', sessionId, host, selectedProject.project);
+    const preProcessedExpList = await fetchData
+      .get_all_experiments_by_data_type('data:PreProcessedData', sessionId, host, selectedProject.project);
+    // get unique visit number
+    let expTypeVisitMap = new Map();
+    expTypeVisitMap.set('PROC', []);
+    expTypeVisitMap.set('PREPROC', []);
+    expTypeVisitMap = utils
+      .get_unique_visits(expTypeVisitMap, processedExpList.ResultSet.Result);
+    expTypeVisitMap = utils
+      .get_unique_visits(expTypeVisitMap, preProcessedExpList.ResultSet.Result);
+    // ask visit
+    let selectedProcessedVisitIds = null;
+    if (dataType.DataType.includes('Processed')) {
+      // ask for processed visit number
+      selectedProcessedVisitIds = await inquirer.askVisits('Processed Data', expTypeVisitMap.get('PROC'));
+    }
+    let selectedPreProcessedVisitIds = null;
+    if (dataType.DataType.includes('Pre-Processed')) {
+      // ask pre-processed visit number
+      selectedPreProcessedVisitIds = await inquirer.askVisits('Pre-Processed Data', expTypeVisitMap.get('PREPROC'));
+    }
+
+    // get all experiments matching selected visit number
+    const matchedProcessedExpList = utils
+      .get_matched_experiments(
+        selectedProcessedVisitIds.visit,
+        processedExpList.ResultSet.Result,
+      );
+    const matchedPreProcessedExpList = utils
+      .get_matched_experiments(
+        selectedPreProcessedVisitIds.visit,
+        preProcessedExpList.ResultSet.Result,
+      );
+    // get resource for selected experiments
     // eslint-disable-next-line no-restricted-syntax
-    for (const elem of dataType.DataType) {
-      // eslint-disable-next-line no-restricted-syntax
-      for (const subj of selectedSubjects.subject) {
-        if (elem === 'Processed') {
-        // get processed experiments
-          status = new Spinner('Finding processed data, please wait...');
-          status.start();
-          await sleep(1000);
-          const processedExp = await fetchData.get_experiments(sessionId, host, selectedProject.project, subj, 'data:ProcessedData');
-          expListObject.push(processedExp.ResultSet.Result[0]);
-          status.stop();
-        }
-        if (elem === 'Pre-Processed') {
-        // get processed experiments
-          status = new Spinner('Finding pre-processed data, please wait...');
-          status.start();
-          await sleep(1000);
-          const preProcessedExp = await fetchData.get_experiments(sessionId, host, selectedProject.project, subj, 'data:PreProcessedData');
-          expListObject.push(preProcessedExp.ResultSet.Result[0]);
-          status.stop();
-        }
+    for (const exp of matchedPreProcessedExpList) {
+      const resources = await fetchData.get_resources(sessionId, host, exp.ID);
+    }
+    // ask pipeline name
+    const pipeline = await inquirer.askPipeline();
+    const matchedProcessedFiles = [];
+    // eslint-disable-next-line no-restricted-syntax
+    for (const exp of matchedProcessedExpList) {
+      const resources = await fetchData.get_resources(sessionId, host, exp.ID);
+      const resourceFileList = resources.ResultSet.Result;
+      // filter by pipeline name
+      const matchingFiles = utils
+        .get_files_matching_pipeline_name(resourceFileList, pipeline.pipeline);
+      if (matchingFiles.length) {
+        matchingFiles.forEach((file) => {
+          matchedProcessedFiles.push(file);
+        });
       }
     }
-    const selectedExps = await inquirer.askexperiments(expListObject);
-    // download resources
-    const resourceToDownload = [];
+
+    const matchedPreProcessedFiles = [];
     // eslint-disable-next-line no-restricted-syntax
-    for (const exp of selectedExps.experiments) {
-      // list resources
-      const resources = await fetchData.get_resources(sessionId, host, exp);
-      resourceToDownload.push(resources.ResultSet.Result[0]);
+    for (const exp of matchedPreProcessedExpList) {
+      const resources = await fetchData.get_resources(sessionId, host, exp.ID);
+      const resourceFileList = resources.ResultSet.Result;
+      // filter by pipeline name
+      const matchingFiles = utils
+        .get_files_matching_pipeline_name(resourceFileList, pipeline.pipeline);
+      if (matchingFiles.length) {
+        matchingFiles.forEach((file) => {
+          matchedPreProcessedFiles.push(file);
+        });
+      }
     }
+
     // ask resource to Download
-    const selectedFiles = await inquirer.askResourceToDownload(resourceToDownload);
+    let selectedFiles = await inquirer.askResourceToDownload(matchedProcessedFiles, 'Processed');
     // download file
     // const downloadStatus = new Spinner('Downloading files, please wait...');
     // downloadStatus.start();
     // eslint-disable-next-line no-restricted-syntax
-    for (const file of selectedFiles.files) {
-      // list resources
-      // eslint-disable-next-line no-unused-vars
-      const downloadFileStatus = new Spinner(`Downloading file ${file}, please wait...\n`);
-      downloadFileStatus.start();
-      // eslint-disable-next-line no-unused-vars
-      const rsStatus = await fetchData.download_file(sessionId, host, file).then(() => {
-        downloadFileStatus.stop();
-      });
-    }
+    await downloadFiles(selectedFiles, sessionId, host);
+    selectedFiles = await inquirer.askResourceToDownload(matchedPreProcessedFiles, 'Pre-Processed');
+    await downloadFiles(selectedFiles, sessionId, host);
     // downloadStatus.stop();
     return 0;
   }
@@ -349,7 +426,8 @@ const run = async (options) => {
 };
 const options = yargs
   .usage('Usage: Command <Options>')
-  .example('n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Upload Data" -d "Pre-Processed" "Processed" -o TRACK-FA')
+  .example(chalk.yellow('- Upload Processed and Pre-Processed data in non-interactive mode:'))
+  .example(chalk.green('   n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Upload Data" -d "Pre-Processed" "Processed" -o TRACK-FA'))
   .command(['interactive', 'i'], 'Run in interactive mode', {}, () => { console.log('Running in interactive mode'); })
   .command(['non-interactive', 'n'], 'Run in non-interactive mode',
     () => yargs

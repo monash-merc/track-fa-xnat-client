@@ -217,4 +217,21 @@ module.exports = {
       return error;
     }
   },
+
+  get_all_experiments_by_data_type: async (expType, cookie, host, project) => {
+    const requestOptions = {
+      method: 'GET',
+      headers: {
+        cookie: `JSESSIONID=${cookie}`,
+      },
+      redirect: 'follow',
+    };
+    try {
+      const response = await fetch(`${host}data/projects/${project}/experiments/?xsiType=${expType}&format=json`, requestOptions);
+      return await response.json();
+    } catch (error) {
+      console.log(error);
+      return error;
+    }
+  },
 };
