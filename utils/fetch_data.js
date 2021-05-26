@@ -1,7 +1,11 @@
+const CLI = require('clui');
+
 const fetch = require('node-fetch');
 const fs = require('fs');
 const FormData = require('form-data');
 const chalk = require('chalk');
+
+const { Spinner } = CLI;
 
 module.exports = {
   authenticate_user: async (username, password, host) => {
@@ -190,7 +194,7 @@ module.exports = {
     }
   },
   // eslint-disable-next-line consistent-return
-  download_file: async (cookie, host, file) => {
+  download_file: async (cookie, host, file, path) => {
     const fileSplit = file.split('/');
     const fileName = fileSplit[fileSplit.length - 1];
     const requestOptions = {
@@ -203,13 +207,16 @@ module.exports = {
     try {
       // const fileInfo = null;
       const response = await fetch(`${host}${file.substring(1)}`, requestOptions);
-      const fileStream = fs.createWriteStream(fileName);
+      const fileStream = fs.createWriteStream(`${path}/${fileName}`);
       return await new Promise((resolve, reject) => {
+        const downloadFileStatus = new Spinner(`Downloading file ${file}, please wait...\n`);
+        downloadFileStatus.start();
         response.body.pipe(fileStream);
         response.body.on('error', reject);
         fileStream.on('finish', () => {
-          console.log(chalk.green(`File ${fileName} downloaded to ${process.cwd()}`));
+          console.log(chalk.green(`File ${fileName} downloaded to ${path}`));
           resolve();
+          downloadFileStatus.stop();
         });
       });
     } catch (error) {

@@ -59,16 +59,13 @@ async function getProject(mode, options, sessionId, host) {
   return selectedProject;
 }
 
-async function downloadFiles(selectedFiles, sessionId, host) {
+async function downloadFiles(selectedFiles, sessionId, host, dir) {
   // eslint-disable-next-line no-restricted-syntax
   for (const file of selectedFiles.files) {
     // list resources
     // eslint-disable-next-line no-unused-vars
-    const downloadFileStatus = new Spinner(`Downloading file ${file}, please wait...\n`);
-    downloadFileStatus.start();
     // eslint-disable-next-line no-unused-vars
-    const rsStatus = await fetchData.download_file(sessionId, host, file).then(() => {
-      downloadFileStatus.stop();
+    const rsStatus = await fetchData.download_file(sessionId, host, file, dir).then(() => {
     });
   }
 }
@@ -161,7 +158,6 @@ const run = async (options) => {
       // ask pre-processed visit number
       selectedPreProcessedVisitIds = await inquirer.askVisits('Pre-Processed Data', expTypeVisitMap.get('PREPROC'));
     }
-
     // get all experiments matching selected visit number
     const matchedProcessedExpList = utils
       .get_matched_experiments(
@@ -211,9 +207,18 @@ const run = async (options) => {
     // const downloadStatus = new Spinner('Downloading files, please wait...');
     // downloadStatus.start();
     // eslint-disable-next-line no-restricted-syntax
-    await downloadFiles(selectedFiles, sessionId, host);
+    // create a directory with TRACKFA_PROC_{pipelineName}
+    const processedDir = `./TRACKFA_PROC_${pipeline.pipeline}`;
+    if (!fs.existsSync(processedDir)) {
+      fs.mkdirSync(processedDir);
+    }
+    await downloadFiles(selectedFiles, sessionId, host, processedDir);
     selectedFiles = await inquirer.askResourceToDownload(matchedPreProcessedFiles, 'Pre-Processed');
-    await downloadFiles(selectedFiles, sessionId, host);
+    const preProcessedDir = `./TRACKFA_PREPROC_${pipeline.pipeline}`;
+    if (!fs.existsSync(preProcessedDir)) {
+      fs.mkdirSync(preProcessedDir);
+    }
+    await downloadFiles(selectedFiles, sessionId, host, preProcessedDir);
     // downloadStatus.stop();
     return 0;
   }
