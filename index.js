@@ -148,15 +148,26 @@ const run = async (options) => {
     expTypeVisitMap = utils
       .get_unique_visits(expTypeVisitMap, preProcessedExpList.ResultSet.Result);
     // ask visit
-    let selectedProcessedVisitIds = null;
+    let selectedProcessedVisitIds = {};
     if (dataType.DataType.includes('Processed')) {
-      // ask for processed visit number
-      selectedProcessedVisitIds = await inquirer.askVisits('Processed Data', expTypeVisitMap.get('PROC'));
+      if (mode === 'non-interactive') {
+        selectedProcessedVisitIds.visit = options.visits;
+      }
+      if (mode === 'interactive') {
+        // ask for processed visit number
+        selectedProcessedVisitIds = await inquirer.askVisits('Processed Data', expTypeVisitMap.get('PROC'));
+      }
     }
-    let selectedPreProcessedVisitIds = null;
+
+    let selectedPreProcessedVisitIds = {};
     if (dataType.DataType.includes('Pre-Processed')) {
-      // ask pre-processed visit number
-      selectedPreProcessedVisitIds = await inquirer.askVisits('Pre-Processed Data', expTypeVisitMap.get('PREPROC'));
+      if (mode === 'non-interactive') {
+        selectedPreProcessedVisitIds.visit = options.visits;
+      }
+      if (mode === 'interactive') {
+        // ask for processed visit number
+        selectedPreProcessedVisitIds = await inquirer.askVisits('Pre-Processed Data', expTypeVisitMap.get('PREPROC'));
+      }
     }
     // get all experiments matching selected visit number
     const matchedProcessedExpList = utils
@@ -170,7 +181,13 @@ const run = async (options) => {
         preProcessedExpList.ResultSet.Result,
       );
     // ask pipeline name
-    const pipeline = await inquirer.askPipeline();
+    let pipeline = {};
+    if (mode === 'interactive') {
+      pipeline = await inquirer.askPipeline();
+    }
+    if (mode === 'non-interactive') {
+      pipeline.pipeline = options.pipeline;
+    }
     const matchedProcessedFiles = [];
     // eslint-disable-next-line no-restricted-syntax
     for (const exp of matchedProcessedExpList) {
@@ -202,7 +219,18 @@ const run = async (options) => {
     }
 
     // ask resource to Download
-    let selectedFiles = await inquirer.askResourceToDownload(matchedProcessedFiles, 'Processed');
+    let selectedFiles = {};
+    if (mode === 'interactive') {
+      selectedFiles = await inquirer.askResourceToDownload(matchedProcessedFiles, 'Processed');
+    }
+    if (mode === 'non-interactive') {
+      console.log(chalk.yellow(`Found ${matchedProcessedFiles.length} matching Processed files for pipeline ${pipeline.pipeline}`));
+      const filesArray = [];
+      matchedProcessedFiles.forEach(((file) => {
+        filesArray.push(file.URI);
+      }));
+      selectedFiles.files = filesArray;
+    }
     // download file
     // const downloadStatus = new Spinner('Downloading files, please wait...');
     // downloadStatus.start();
@@ -213,7 +241,17 @@ const run = async (options) => {
       fs.mkdirSync(processedDir);
     }
     await downloadFiles(selectedFiles, sessionId, host, processedDir);
-    selectedFiles = await inquirer.askResourceToDownload(matchedPreProcessedFiles, 'Pre-Processed');
+    if (mode === 'interactive') {
+      selectedFiles = await inquirer.askResourceToDownload(matchedPreProcessedFiles, 'Pre-Processed');
+    }
+    if (mode === 'non-interactive') {
+      console.log(chalk.yellow(`Found ${matchedPreProcessedFiles.length} matching Pre-Processed files for pipeline ${pipeline.pipeline}`));
+      const filesArray = [];
+      matchedPreProcessedFiles.forEach(((file) => {
+        filesArray.push(file.URI);
+      }));
+      selectedFiles.files = filesArray;
+    }
     const preProcessedDir = `./TRACKFA_PREPROC_${pipeline.pipeline}`;
     if (!fs.existsSync(preProcessedDir)) {
       fs.mkdirSync(preProcessedDir);
@@ -449,12 +487,24 @@ const options = yargs
       })
       .option('project', {
         alias: 'o', describe: 'Choose project', type: 'string', demandOption: true,
+      })
+      .option('visits', {
+        alias: 'v', describe: 'Choose visits', type: 'array',
+      })
+      .option('pipeline', {
+        alias: 'P', describe: 'Choose pipeline name', type: 'string',
       }),
     () => {
       console.log('Running in non-interactive mode');
       // run
     })
   .demandCommand()
+  .check((args) => {
+    if (args.method === 'Download Data' && (!args.pipeline || !args.visits)) {
+      throw new Error('You have selected to download data, Please provide pipeline name and visits');
+    }
+    return true;
+  })
   .help()
   .argv;
 
