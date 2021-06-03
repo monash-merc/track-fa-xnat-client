@@ -28,3 +28,5 @@ jobs:
             track-fa-xnat-client-win.exe
             track-fa-xnat-client-linux
             track-fa-xnat-client-macos
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
