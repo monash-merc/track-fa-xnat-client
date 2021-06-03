@@ -23,8 +23,8 @@ jobs:
         id: create_release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
-          with:
-            files: |
-              track-fa-xnat-client-win.exe
-              track-fa-xnat-client-linux
-              track-fa-xnat-client-macos
+        with:
+          files: |
+            track-fa-xnat-client-win.exe
+            track-fa-xnat-client-linux
+            track-fa-xnat-client-macos
