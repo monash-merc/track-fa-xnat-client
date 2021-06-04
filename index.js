@@ -512,13 +512,13 @@ const options = yargs
 clear();
 console.log(
   chalk.yellow(
-    figlet.textSync('---------------------', { font: 'big', horizontalLayout: 'full' }),
+    figlet.textSync('---------------------', { font: 'Big', horizontalLayout: 'full' }),
   ),
 );
 
 console.log(
   chalk.yellow(
-    figlet.textSync('TRACK-FA-XNAT-CLIENT', { font: 'big', horizontalLayout: 'full' }),
+    figlet.textSync('TRACK-FA-XNAT-CLIENT', { font: 'Big', horizontalLayout: 'full' }),
   ),
 );
 console.log(
@@ -526,7 +526,7 @@ console.log(
 );
 console.log(
   chalk.yellow(
-    figlet.textSync('---------------------', { font: 'big', horizontalLayout: 'full' }),
+    figlet.textSync('---------------------', { font: 'Big', horizontalLayout: 'full' }),
   ),
 );
 console.log(
