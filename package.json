@@ -36,7 +36,7 @@
   },
   "pkg": {
     "assets": [
-      "node_modules/figlet/fonts/big.flf"
+      "node_modules/figlet/fonts/Big.flf"
     ],
     "targets": [
       "latest-win-x64",
