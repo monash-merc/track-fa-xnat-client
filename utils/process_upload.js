@@ -5,7 +5,9 @@ const fetchData = require('./fetch_data');
 
 const { Spinner } = CLI;
 module.exports = {
-  processed_files: async function processedFiles(fileList, sessionId, host, dryRun, datatype) {
+  processed_files: async function
+  processedFiles(fileList, sessionId, host, dryRun, datatype, selectedProject) {
+    console.log(selectedProject);
     const returnObj = new Map();
     const subjectToCreate = [];
     const expToCreate = [];
@@ -18,13 +20,15 @@ module.exports = {
       const fileType = fileSplitArr[2];
       const expName = `${subject}_${fileType}`;
       // check if subject exist
-      const subjectExist = await fetchData.check_subjects(sessionId, host, subject);
+      const subjectExist = await fetchData
+        .check_subjects(sessionId, host, subject, selectedProject);
       if (subjectExist) {
         console.log(chalk.yellow(`Found subject with id ${subject}`));
       } else if (!subjectExist && !dryRun) {
       // create subject
       // subject will be created while creating experiment
-        const subjectCreated = await fetchData.create_subjects(sessionId, host, subject);
+        const subjectCreated = await fetchData
+          .create_subjects(sessionId, host, subject, selectedProject);
         if (subjectCreated) {
           console.log(`Created subject ${subject}`);
         }
@@ -32,7 +36,8 @@ module.exports = {
         subjectToCreate.push(subject);
       }
       // check if experiment exist
-      const expExist = await fetchData.check_experiments(sessionId, host, expName, subject);
+      const expExist = await fetchData
+        .check_experiments(sessionId, host, expName, subject, selectedProject);
 
       // create experiment
       if (expExist) {
@@ -43,7 +48,7 @@ module.exports = {
         console.log(chalk.red(`No exp with label ${expName} found for subject ${subject}`));
         console.log(chalk.green(`Creating exp with label ${expName} `));
         const expCreated = await fetchData
-          .create_experiment(sessionId, host, expName, subject, datatype);
+          .create_experiment(sessionId, host, expName, subject, datatype, selectedProject);
         if (expCreated) {
           console.log(`Created ${datatype} Data experiment with label ${expName}`);
         } else {
@@ -53,7 +58,8 @@ module.exports = {
       // attach resource
       if (dryRun) {
       // check if resource exist
-        const resourceExist = await fetchData.get_resource(sessionId, host, expName, subject);
+        const resourceExist = await fetchData
+          .get_resource(sessionId, host, expName, subject, selectedProject);
         if (!resourceExist) {
           fileToUpload.push(file);
         }
@@ -61,7 +67,7 @@ module.exports = {
       // attach resource
         const fileUpoadStatus = new Spinner(`uploading file ${file}....`);
         fileUpoadStatus.start();
-        const resourceCreated = await fetchData.add_resource(sessionId, host, expName, subject, '', `upload_folder/${file}`);
+        const resourceCreated = await fetchData.add_resource(sessionId, host, expName, subject, '', `upload_folder/${file}`, selectedProject);
         fileUpoadStatus.stop();
         if (resourceCreated) {
           console.log(chalk.green(`${file} uploaded successfully`));

@@ -128,8 +128,38 @@ const run = async (options) => {
     methodType.DataType = options.method;
     console.log(`You have selected to ${options.method}`);
   }
-
-  if (methodType.DataType === 'Download Data') {
+  if (methodType.DataType === 'Download Data' && options.data_type.includes('Raw')) {
+    const selectedProject = await getProject(mode, options, sessionId, host);
+    console.log(`Downloading Raw Data for subject ${options.subject} and visits ${options.visits}`);
+    // get list of mr seesion data
+    const subject_mr_sessions = await fetchData.get_experiments(sessionId, host, selectedProject.project, options.subject, 'xnat:mrSessionData');
+    // filter mr session based on visits
+    const subject_mr_sessions_array = subject_mr_sessions.ResultSet.Result
+    const mr_sessions_to_download = [];
+    // eslint-disable-next-line array-callback-return
+    subject_mr_sessions_array.map((elem, index) => {
+      if (options.visits.includes(elem.label.slice(-2))) {
+        mr_sessions_to_download.push({ id: elem.ID, visit: elem.label});
+      }
+    })
+    console.log(mr_sessions_to_download);
+    // Download data
+    // create a folder
+    if(!fs.existsSync(`./TRACK_FA_${options.subject}`)){
+      fs.mkdirSync(`./TRACK_FA_${options.subject}`);
+    }
+    mr_sessions_to_download.forEach((item) => {
+      if(!fs.existsSync(`./TRACK_FA_${options.subject}/${item.visit}`)) {
+        fs.mkdirSync(`./TRACK_FA_${options.subject}/${item.visit}`);
+      }
+      // download data
+      const url = `data/projects/${selectedProject.project}/subjects/${options.subject}/experiments/${item.id}/scans/ALL/files?format=zip`
+      fetchData.download_mr_zip(sessionId, host, url, `./TRACK_FA_${options.subject}/${item.visit}`, `${options.subject}_${item.visit}.zip`).then(
+        //console.log("Files Downloaded");
+      )
+    })
+  }
+  if (methodType.DataType === 'Download Data' && (options.data_type.includes('Processed') || options.data_type.includes('Pre-Processed'))) {
     const dataType = await getDataType(mode, options);
     // generate a map of pipeline name and visits based on dataType
     // ask project
@@ -284,6 +314,8 @@ const run = async (options) => {
         // eslint-disable-next-line no-unused-vars
         selectedProject = await inquirer.askProject(allProjects);
       }
+    } else {
+      selectedProject = await getProject(mode, options, sessionId, host);
     }
     // get list of file to upload
     const fileReadStatus = new Spinner('Reading directory, please wait...');
@@ -379,7 +411,8 @@ const run = async (options) => {
         await sleep(1000);
         // find list of processed data to upload
         ProcessedFileReadStatus.stop();
-        const dataObj = await processedFiles.processed_files(processedList, sessionId, host, true, 'ProcessedData');
+        const dataObj = await processedFiles
+          .processed_files(processedList, sessionId, host, true, 'ProcessedData', selectedProject.project);
         const subjectToCreate = dataObj.get('subject_create');
         const expToCreate = dataObj.get('exp_create');
         const fileToUpload = dataObj.get('resource_upload');
@@ -405,14 +438,14 @@ const run = async (options) => {
             const userResponse = await inquirer.askContinue();
             if (userResponse.continue) {
             // upload
-              await processedFiles.processed_files(processedList, sessionId, host, false, 'ProcessedData');
+              await processedFiles.processed_files(processedList, sessionId, host, false, 'ProcessedData', selectedProject.project);
             } else {
               return process.exit(1);
             }
           }
         }
         if (mode === 'non-interactive') {
-          await processedFiles.processed_files(processedList, sessionId, host, false, 'ProcessedData');
+          await processedFiles.processed_files(processedList, sessionId, host, false, 'ProcessedData', selectedProject.project);
         }
 
         // read all files in a folder
@@ -421,7 +454,8 @@ const run = async (options) => {
         PreProcessedFileReadStatus.start();
         await sleep(1000);
         PreProcessedFileReadStatus.stop();
-        const dataObj = await processedFiles.processed_files(preProcessedList, sessionId, host, true, 'PreProcessedData');
+        const dataObj = await processedFiles
+          .processed_files(preProcessedList, sessionId, host, true, 'PreProcessedData', selectedProject.project);
         const subjectToCreate = dataObj.get('subject_create');
         const expToCreate = dataObj.get('exp_create');
         const fileToUpload = dataObj.get('resource_upload');
@@ -446,14 +480,14 @@ const run = async (options) => {
             const userResponse = await inquirer.askContinue();
             if (userResponse.continue) {
             // upload
-              await processedFiles.processed_files(preProcessedList, sessionId, host, false, 'PreProcessedData');
+              await processedFiles.processed_files(preProcessedList, sessionId, host, false, 'PreProcessedData', selectedProject.project);
             } else {
               return process.exit(1);
             }
           }
         }
         if (mode === 'non-interactive') {
-          await processedFiles.processed_files(preProcessedList, sessionId, host, false, 'PreProcessedData');
+          await processedFiles.processed_files(preProcessedList, sessionId, host, false, 'PreProcessedData', selectedProject.project);
         }
       } else {
       // TODO raw data
@@ -468,7 +502,8 @@ const options = yargs
   .example(chalk.yellow('- Upload Processed and Pre-Processed data in non-interactive mode:'))
   .example(chalk.green('   n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Upload Data" -d "Pre-Processed" "Processed" -o TRACK-FA'))
   .example(chalk.yellow('- Download Processed and Pre-Processed data in non-interactive mode:') + chalk.green('\n\t n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Download Data" -d "Processed" "Pre-Processed" -o TRACKFA -P "SpineMorph_SpineT2_SCT_UMN_10Sep2020" -v "01" "02"'))
-  .command(['interactive', 'i'], 'Run in interactive mode', {}, () => { console.log('Running in interactive mode'); })
+  .example(chalk.yellow('- Download Raw data in non-interactive mode:') + chalk.green('\n\t n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Download Data" -d "Raw" -s TRACKFA_AAN001 -v "01" -o TRACKFA'))
+    .command(['interactive', 'i'], 'Run in interactive mode', {}, () => { console.log('Running in interactive mode'); })
   .command(['non-interactive', 'n'], 'Run in non-interactive mode',
     () => yargs
       .option('host', {
@@ -489,6 +524,9 @@ const options = yargs
       .option('project', {
         alias: 'o', describe: 'Choose project', type: 'string', demandOption: true,
       })
+      .option('subject', {
+        alias: 's', describe: 'Choose subject', type: 'string',
+      })
       .option('visits', {
         alias: 'v', describe: 'Choose visits', type: 'array',
       })
@@ -501,8 +539,12 @@ const options = yargs
     })
   .demandCommand()
   .check((args) => {
-    if (args.method === 'Download Data' && (!args.pipeline || !args.visits)) {
-      throw new Error('You have selected to download data, Please provide pipeline name and visits');
+    if (args.method === 'Download Data') {
+      if (args.data_type.includes('Raw') && (!args.subject && !args.visits)) {
+        throw new Error('You have selected to download Raw data, Please provide subject name and visits');
+      } else if ((args.data_type.includes('Processed') || args.data_type.includes('Pre-Processed')) && (!args.pipeline || !args.visits)) {
+        throw new Error('You have selected to download Processed or Pre-Processed data, Please provide pipeline name and visits');
+      }
     }
     return true;
   })

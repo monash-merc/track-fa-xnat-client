@@ -55,7 +55,7 @@ module.exports = {
       return error;
     }
   },
-  check_subjects: async (cookie, host, subject) => {
+  check_subjects: async (cookie, host, subject, selectedProject) => {
     const requestOptions = {
       method: 'GET',
       headers: {
@@ -64,7 +64,7 @@ module.exports = {
       redirect: 'follow',
     };
     try {
-      const response = await fetch(`${host}data/projects/TRACKFA/subjects/${subject}?format=json`, requestOptions);
+      const response = await fetch(`${host}data/projects/${selectedProject}/subjects/${subject}?format=json`, requestOptions);
       // console.log(response.json())
       return !!response.ok;
     } catch (error) {
@@ -72,7 +72,7 @@ module.exports = {
       return error;
     }
   },
-  create_subjects: async (cookie, host, subject) => {
+  create_subjects: async (cookie, host, subject, selectedProject) => {
     const requestOptions = {
       method: 'PUT',
       headers: {
@@ -81,7 +81,7 @@ module.exports = {
       redirect: 'follow',
     };
     try {
-      const response = await fetch(`${host}data/projects/TRACKFA/subjects/${subject}?format=json`, requestOptions);
+      const response = await fetch(`${host}data/projects/${selectedProject}/subjects/${subject}?format=json`, requestOptions);
       // console.log(response.json())
       return !!response.ok;
     } catch (error) {
@@ -89,7 +89,7 @@ module.exports = {
       return error;
     }
   },
-  check_experiments: async (cookie, host, exp, subject) => {
+  check_experiments: async (cookie, host, exp, subject, selectedProject) => {
     const requestOptions = {
       method: 'GET',
       headers: {
@@ -98,7 +98,7 @@ module.exports = {
       redirect: 'follow',
     };
     try {
-      const response = await fetch(`${host}data/projects/TRACKFA/subjects/${subject}/experiments/${exp}?format=json`, requestOptions);
+      const response = await fetch(`${host}data/projects/${selectedProject}/subjects/${subject}/experiments/${exp}?format=json`, requestOptions);
       // console.log(response.json())
       return !!response.ok;
     } catch (error) {
@@ -122,7 +122,7 @@ module.exports = {
       return error;
     }
   },
-  create_experiment: async (cookie, host, exp, subject, datatype) => {
+  create_experiment: async (cookie, host, exp, subject, datatype, selectedProject) => {
     const requestOptions = {
       method: 'PUT',
       headers: {
@@ -131,7 +131,7 @@ module.exports = {
       redirect: 'follow',
     };
     try {
-      const response = await fetch(`${host}data/projects/TRACKFA/subjects/${subject}/experiments/${exp}?xnat:${datatype}/acquisition_site=Monash`, requestOptions);
+      const response = await fetch(`${host}data/projects/${selectedProject}/subjects/${subject}/experiments/${exp}?xnat:${datatype}/acquisition_site=Monash`, requestOptions);
       // console.log(response.json())
       return !!response.ok;
     } catch (error) {
@@ -139,7 +139,7 @@ module.exports = {
       return error;
     }
   },
-  add_resource: async (cookie, host, exp, subject, datatype, file) => {
+  add_resource: async (cookie, host, exp, subject, datatype, file, selectedProject) => {
     const formData = new FormData();
     formData.append('file', fs.createReadStream(file));
     const requestOptions = {
@@ -151,7 +151,7 @@ module.exports = {
       body: formData,
     };
     try {
-      const response = await fetch(`${host}data/projects/TRACKFA/subjects/${subject}/experiments/${exp}/resources/${exp}/files/${file.split('/')[1]}?format=zip`, requestOptions);
+      const response = await fetch(`${host}data/projects/${selectedProject}/subjects/${subject}/experiments/${exp}/resources/${exp}/files/${file.split('/')[1]}?format=zip`, requestOptions);
       console.log(await response.text());
       return !!response.ok;
     } catch (error) {
@@ -159,7 +159,7 @@ module.exports = {
       return error;
     }
   },
-  get_resource: async (cookie, host, exp, subject) => {
+  get_resource: async (cookie, host, exp, subject, selectedProject) => {
     const requestOptions = {
       method: 'PUT',
       headers: {
@@ -169,7 +169,7 @@ module.exports = {
     };
 
     try {
-      const response = await fetch(`${host}data/projects/TRACKFA/subjects/${subject}/experiments/${exp}/resources/`, requestOptions);
+      const response = await fetch(`${host}data/projects/${selectedProject}/subjects/${subject}/experiments/${exp}/resources/`, requestOptions);
       return !!response.ok;
     } catch (error) {
       console.log(error);
@@ -224,7 +224,34 @@ module.exports = {
       return error;
     }
   },
-
+  download_mr_zip: async (cookie, host, url, path, fileName) => {
+    const requestOptions = {
+      method: 'GET',
+      headers: {
+        cookie: `JSESSIONID=${cookie}`,
+      },
+      redirect: 'follow',
+    };
+    try {
+      // const fileInfo = null;
+      const response = await fetch(`${host}${url}`, requestOptions);
+      const fileStream = fs.createWriteStream(`${path}/${fileName}`);
+      return await new Promise((resolve, reject) => {
+        const downloadFileStatus = new Spinner('Downloading file, please wait...\n');
+        downloadFileStatus.start();
+        response.body.pipe(fileStream);
+        response.body.on('error', reject);
+        fileStream.on('finish', () => {
+          console.log(chalk.green(`File downloaded to ${path}`));
+          resolve();
+          downloadFileStatus.stop();
+        });
+      });
+    } catch (error) {
+      console.log(error);
+      return error;
+    }
+  },
   get_all_experiments_by_data_type: async (expType, cookie, host, project) => {
     const requestOptions = {
       method: 'GET',
