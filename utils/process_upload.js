@@ -16,7 +16,7 @@ module.exports = {
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
       const fileSplitArr = file.split('_');
-      const subject = fileSplitArr[1];
+      const subject = `TRACKFA_${fileSplitArr[1]}`;
       const fileType = fileSplitArr[2];
       const expName = `${subject}_${fileType}`;
       // check if subject exist
