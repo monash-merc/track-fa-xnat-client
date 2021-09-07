@@ -500,7 +500,7 @@ const run = async (options) => {
 const options = yargs
   .usage('Usage: Command <Options>')
   .example(chalk.yellow('- Upload Processed and Pre-Processed data in non-interactive mode:'))
-  .example(chalk.green('   n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Upload Data" -d "Pre-Processed" "Processed" -o TRACK-FA'))
+  .example(chalk.green('   n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Upload Data" -d "Pre-Processed" "Processed" -o TRACKFA'))
   .example(chalk.yellow('- Download Processed and Pre-Processed data in non-interactive mode:') + chalk.green('\n\t n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Download Data" -d "Processed" "Pre-Processed" -o TRACKFA -P "SpineMorph_SpineT2_SCT_UMN_10Sep2020" -v "01" "02"'))
   .example(chalk.yellow('- Download Raw data in non-interactive mode:') + chalk.green('\n\t n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Download Data" -d "Raw" -s TRACKFA_AAN001 -v "01" -o TRACKFA'))
     .command(['interactive', 'i'], 'Run in interactive mode', {}, () => { console.log('Running in interactive mode'); })
