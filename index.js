@@ -59,6 +59,27 @@ async function getProject(mode, options, sessionId, host) {
   return selectedProject;
 }
 
+async function getSubject(mode, options, sessionId, host, project) {
+  let selectedSubject = {};
+  if (mode === 'interactive') {
+    if (!conf.get('subject')) {
+      const status = new Spinner(`Getting subjects in ${project.project}, please wait...`);
+      status.start();
+      await sleep(1000);
+      const allSubjects = await fetchData.get_all_subjects(sessionId, host, project.project);
+      status.stop();
+      // prompt user  to select a subject
+      // eslint-disable-next-line no-unused-vars
+      selectedSubject = await inquirer.askSubject(allSubjects);
+    } else {
+      selectedSubject.project = conf.get('subject');
+    }
+  }
+
+  return selectedSubject;
+}
+
+
 async function downloadFiles(selectedFiles, sessionId, host, dir) {
   // eslint-disable-next-line no-restricted-syntax
   for (const file of selectedFiles.files) {
@@ -116,7 +137,10 @@ const run = async (options) => {
   if (mode === 'interactive') {
     if (!conf.get('method')) {
       methodType = await inquirer.askMethodType();
-      console.log(`You have selected to ${conf.get('method')} data`);
+      dataType = await inquirer.askDataType('download');
+      options.data_type = dataType['DataType'];
+      conf.data_type = dataType;
+      //console.log(`You have selected to ${conf.get('method')} data`);
     } else {
       methodType = {};
       methodType.DataType = conf.get('method');
@@ -130,19 +154,39 @@ const run = async (options) => {
   }
   if (methodType.DataType === 'Download Data' && options.data_type.includes('Raw')) {
     const selectedProject = await getProject(mode, options, sessionId, host);
-    console.log(`Downloading Raw Data for subject ${options.subject} and visits ${options.visits}`);
+    // get a subject
+    let selectedSubject = options.subject;
+    if (!options.subject) {
+      selectedSubject = (await getSubject(mode, options, sessionId, host, selectedProject)).subject;
+    }
+    // get visits
+    let visit_list = utils.get_visit_id_list(100);
+    if (!options.visits) {
+      visit_list = [];
+      let visit_input = await inquirer.askVisitsInput();
+      visit_list.push(visit_input.visit);
+      let cont = await inquirer.askAdditionalVisit();
+      while (cont.continue == true) {
+          visit_input = await inquirer.askVisitsInput();
+          visit_list.push(visit_input.visit);  
+          cont = await inquirer.askAdditionalVisit();
+      }
+      options.visits = visit_list;
+      // options.visits = await inquirer.askVisitsInput();
+    }
+    console.log(`Downloading Raw Data for subject ${selectedSubject} and visits ${options.visits}`);
     // get list of mr seesion data
-    const subject_mr_sessions = await fetchData.get_experiments(sessionId, host, selectedProject.project, options.subject, 'xnat:mrSessionData');
+    const subject_mr_sessions = await fetchData.get_experiments(sessionId, host, selectedProject.project, selectedSubject, 'xnat:mrSessionData');
     // filter mr session based on visits
     const subject_mr_sessions_array = subject_mr_sessions.ResultSet.Result
     const mr_sessions_to_download = [];
     // eslint-disable-next-line array-callback-return
     subject_mr_sessions_array.map((elem, index) => {
-      if (options.visits.includes(elem.label.slice(-2))) {
+      // convert to string to ints, ensures a numeric match e.g: 007 == 07
+      if (options.visits.map(Number).includes(parseInt(elem.label.slice(-2)))) {
         mr_sessions_to_download.push({ id: elem.ID, visit: elem.label});
       }
     })
-    console.log(mr_sessions_to_download);
     // Download data
     // create a folder
     if(!fs.existsSync(`./download_folder/TRACK_FA_${selectedSubject}`)){
@@ -160,7 +204,9 @@ const run = async (options) => {
     })
   }
   if (methodType.DataType === 'Download Data' && (options.data_type.includes('Processed') || options.data_type.includes('Pre-Processed'))) {
-    const dataType = await getDataType(mode, options);
+    // const dataType = await getDataType(mode, options);
+    const dataType = {};
+    dataType.DataType = options.data_type;
     // generate a map of pipeline name and visits based on dataType
     // ask project
     const status = new Spinner('Getting XNAT project, please wait...');
@@ -188,7 +234,6 @@ const run = async (options) => {
         selectedProcessedVisitIds = await inquirer.askVisits('Processed Data', expTypeVisitMap.get('PROC'));
       }
     }
-
     let selectedPreProcessedVisitIds = {};
     if (dataType.DataType.includes('Pre-Processed')) {
       if (mode === 'non-interactive') {
@@ -251,7 +296,11 @@ const run = async (options) => {
     // ask resource to Download
     let selectedFiles = {};
     if (mode === 'interactive') {
+      if (matchedProcessedFiles.length > 0) {
       selectedFiles = await inquirer.askResourceToDownload(matchedProcessedFiles, 'Processed');
+      } else {
+        console.log('No matching Processed files found');
+      }
     }
     if (mode === 'non-interactive') {
       console.log(chalk.yellow(`Found ${matchedProcessedFiles.length} matching Processed files for pipeline ${pipeline.pipeline}`));
@@ -272,7 +321,11 @@ const run = async (options) => {
     }
     await downloadFiles(selectedFiles, sessionId, host, processedDir);
     if (mode === 'interactive') {
+      if (matchedPreProcessedFiles.length > 0) {
       selectedFiles = await inquirer.askResourceToDownload(matchedPreProcessedFiles, 'Pre-Processed');
+      } else {
+        console.log('No matching PreProcessed files found');
+      }
     }
     if (mode === 'non-interactive') {
       console.log(chalk.yellow(`Found ${matchedPreProcessedFiles.length} matching Pre-Processed files for pipeline ${pipeline.pipeline}`));

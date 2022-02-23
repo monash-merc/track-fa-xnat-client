@@ -5,10 +5,10 @@ module.exports = {
       const visitNumber = exp.label.split('_')[2].match(/\d+/g);
       // create a list of visit number
       if (existingList.get(expType[0])) { 
-      if (!existingList.get(expType[0]).includes(visitNumber[0])) {
-        existingList.get(expType[0]).push(visitNumber[0]);
-      }
-      // console.log(`${expType} : ${visitNumber}`);
+        if (!existingList.get(expType[0]).includes(visitNumber[0])) {
+          existingList.get(expType[0]).push(visitNumber[0]);
+        }
+        // console.log(`${expType} : ${visitNumber}`);
       }
     });
     return existingList;
@@ -19,7 +19,7 @@ module.exports = {
       const visitNumber = exp.label.split('_')[2].match(/\d+/g);
       if (visit) {
         if (visit.map(Number).includes(parseInt(visitNumber[0]))) {
-        matchedExperimentList.push(exp);
+          matchedExperimentList.push(exp);
         }
       }
     });
@@ -35,4 +35,12 @@ module.exports = {
     });
     return matchedFiles;
   },
+  get_visit_id_list(visit_length) {
+    let visit_id_list = [];
+    for (let i=1; i < visit_length; i++) {
+      let zerofilled = ('000'+i).slice(-3);
+      visit_id_list.push(zerofilled);
+    }
+    return visit_id_list;
+  }
 };
