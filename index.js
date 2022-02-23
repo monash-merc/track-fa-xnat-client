@@ -22,6 +22,7 @@ function sleep(ms) {
   });
 }
 
+// eslint-disable-next-line no-unused-vars
 async function getDataType(mode, options) {
   let dataType = {};
   if (mode === 'interactive') {
@@ -75,10 +76,8 @@ async function getSubject(mode, options, sessionId, host, project) {
       selectedSubject.project = conf.get('subject');
     }
   }
-
   return selectedSubject;
 }
-
 
 async function downloadFiles(selectedFiles, sessionId, host, dir) {
   // eslint-disable-next-line no-restricted-syntax
@@ -137,10 +136,11 @@ const run = async (options) => {
   if (mode === 'interactive') {
     if (!conf.get('method')) {
       methodType = await inquirer.askMethodType();
-      dataType = await inquirer.askDataType('download');
-      options.data_type = dataType['DataType'];
+      const dataType = await inquirer.askDataType(methodType.DataType);
+      // eslint-disable-next-line no-param-reassign
+      options.data_type = dataType.DataType;
       conf.data_type = dataType;
-      //console.log(`You have selected to ${conf.get('method')} data`);
+      // console.log(`You have selected to ${conf.get('method')} data`);
     } else {
       methodType = {};
       methodType.DataType = conf.get('method');
@@ -160,48 +160,48 @@ const run = async (options) => {
       selectedSubject = (await getSubject(mode, options, sessionId, host, selectedProject)).subject;
     }
     // get visits
-    let visit_list = utils.get_visit_id_list(100);
     if (!options.visits) {
-      visit_list = [];
-      let visit_input = await inquirer.askVisitsInput();
-      visit_list.push(visit_input.visit);
+      const visitList = [];
+      let visitInput = await inquirer.askVisitsInput();
+      visitList.push(visitInput.visit);
       let cont = await inquirer.askAdditionalVisit();
-      while (cont.continue == true) {
-          visit_input = await inquirer.askVisitsInput();
-          visit_list.push(visit_input.visit);  
-          cont = await inquirer.askAdditionalVisit();
+      while (cont.continue === true) {
+        visitInput = await inquirer.askVisitsInput();
+        visitList.push(visitInput.visit);
+        cont = await inquirer.askAdditionalVisit();
       }
-      options.visits = visit_list;
+      // eslint-disable-next-line no-param-reassign
+      options.visits = visitList;
       // options.visits = await inquirer.askVisitsInput();
     }
     console.log(`Downloading Raw Data for subject ${selectedSubject} and visits ${options.visits}`);
     // get list of mr seesion data
-    const subject_mr_sessions = await fetchData.get_experiments(sessionId, host, selectedProject.project, selectedSubject, 'xnat:mrSessionData');
+    const subjectMrSessions = await fetchData.get_experiments(sessionId, host, selectedProject.project, selectedSubject, 'xnat:mrSessionData');
     // filter mr session based on visits
-    const subject_mr_sessions_array = subject_mr_sessions.ResultSet.Result
-    const mr_sessions_to_download = [];
+    const subjectMrSessionsArray = subjectMrSessions.ResultSet.Result;
+    const mrSessionsToDownload = [];
     // eslint-disable-next-line array-callback-return
-    subject_mr_sessions_array.map((elem, index) => {
+    subjectMrSessionsArray.map((elem) => {
       // convert to string to ints, ensures a numeric match e.g: 007 == 07
-      if (options.visits.map(Number).includes(parseInt(elem.label.slice(-2)))) {
-        mr_sessions_to_download.push({ id: elem.ID, visit: elem.label});
+      if (options.visits.map(Number).includes(Number(elem.label.slice(-2)))) {
+        mrSessionsToDownload.push({ id: elem.ID, visit: elem.label });
       }
-    })
+    });
     // Download data
     // create a folder
-    if(!fs.existsSync(`./download_folder/TRACK_FA_${selectedSubject}`)){
-      fs.mkdirSync(`./download_folder/TRACK_FA_${selectedSubject}`, { recursive: true });
+    if (!fs.existsSync(`./TRACK_FA_${selectedSubject}`)) {
+      fs.mkdirSync(`./TRACK_FA_${selectedSubject}`, { recursive: true });
     }
-    mr_sessions_to_download.forEach((item) => {
-      if(!fs.existsSync(`./download_folder/TRACK_FA_${selectedSubject}/${item.visit}`)) {
-        fs.mkdirSync(`./download_folder/TRACK_FA_${selectedSubject}/${item.visit}`, { recursive: true });
+    mrSessionsToDownload.forEach((item) => {
+      if (!fs.existsSync(`./TRACK_FA_${selectedSubject}/${item.visit}`)) {
+        fs.mkdirSync(`./TRACK_FA_${selectedSubject}/${item.visit}`, { recursive: true });
       }
       // download data
-      const url = `data/projects/${selectedProject.project}/subjects/${selectedSubject}/experiments/${item.id}/scans/ALL/files?format=zip`
-      fetchData.download_mr_zip(sessionId, host, url, `./download_folder/TRACK_FA_${selectedSubject}/${item.visit}`, `${selectedSubject}_${item.visit}.zip`).then(
-        //console.log("Files Downloaded");
-      )
-    })
+      const url = `data/projects/${selectedProject.project}/subjects/${selectedSubject}/experiments/${item.id}/scans/ALL/files?format=zip`;
+      fetchData.download_mr_zip(sessionId, host, url, `./TRACK_FA_${selectedSubject}/${item.visit}`, `${selectedSubject}_${item.visit}.zip`).then(
+        // console.log("Files Downloaded");
+      );
+    });
   }
   if (methodType.DataType === 'Download Data' && (options.data_type.includes('Processed') || options.data_type.includes('Pre-Processed'))) {
     // const dataType = await getDataType(mode, options);
@@ -297,7 +297,7 @@ const run = async (options) => {
     let selectedFiles = {};
     if (mode === 'interactive') {
       if (matchedProcessedFiles.length > 0) {
-      selectedFiles = await inquirer.askResourceToDownload(matchedProcessedFiles, 'Processed');
+        selectedFiles = await inquirer.askResourceToDownload(matchedProcessedFiles, 'Processed');
       } else {
         console.log('No matching Processed files found');
       }
@@ -315,14 +315,14 @@ const run = async (options) => {
     // downloadStatus.start();
     // eslint-disable-next-line no-restricted-syntax
     // create a directory with TRACKFA_PROC_{pipelineName}
-    const processedDir = `./download_folder/TRACKFA_PROC_${pipeline.pipeline}`;
+    const processedDir = `./TRACKFA_PROC_${pipeline.pipeline}`;
     if (!fs.existsSync(processedDir)) {
       fs.mkdirSync(processedDir, { recursive: true });
     }
     await downloadFiles(selectedFiles, sessionId, host, processedDir);
     if (mode === 'interactive') {
       if (matchedPreProcessedFiles.length > 0) {
-      selectedFiles = await inquirer.askResourceToDownload(matchedPreProcessedFiles, 'Pre-Processed');
+        selectedFiles = await inquirer.askResourceToDownload(matchedPreProcessedFiles, 'Pre-Processed');
       } else {
         console.log('No matching PreProcessed files found');
       }
@@ -335,7 +335,7 @@ const run = async (options) => {
       }));
       selectedFiles.files = filesArray;
     }
-    const preProcessedDir = `./download_folder/TRACKFA_PREPROC_${pipeline.pipeline}`;
+    const preProcessedDir = `./TRACKFA_PREPROC_${pipeline.pipeline}`;
     if (!fs.existsSync(preProcessedDir)) {
       fs.mkdirSync(preProcessedDir, { recursive: true });
     }
@@ -446,13 +446,13 @@ const run = async (options) => {
       const fileSplitArr = file.split('_');
       const fileType = fileSplitArr[2];
       if (fileType) {
-      if (fileType.startsWith('PRO')) {
-      // add to processed list
-        processedList.push(file);
-      }
-      if (fileType.startsWith('PRE')) {
-      // add to pre processed list
-        preProcessedList.push(file);
+        if (fileType.startsWith('PRO')) {
+          // add to processed list
+          processedList.push(file);
+        }
+        if (fileType.startsWith('PRE')) {
+          // add to pre processed list
+          preProcessedList.push(file);
         }
       }
     });
@@ -558,7 +558,7 @@ const options = yargs
   .example(chalk.green('   n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Upload Data" -d "Pre-Processed" "Processed" -o TRACKFA'))
   .example(chalk.yellow('- Download Processed and Pre-Processed data in non-interactive mode:') + chalk.green('\n\t n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Download Data" -d "Processed" "Pre-Processed" -o TRACKFA -P "SpineMorph_SpineT2_SCT_UMN_10Sep2020" -v "01" "02"'))
   .example(chalk.yellow('- Download Raw data in non-interactive mode:') + chalk.green('\n\t n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Download Data" -d "Raw" -s TRACKFA_AAN001 -v "01" -o TRACKFA'))
-    .command(['interactive', 'i'], 'Run in interactive mode', {}, () => { console.log('Running in interactive mode'); })
+  .command(['interactive', 'i'], 'Run in interactive mode', {}, () => { console.log('Running in interactive mode'); })
   .command(['non-interactive', 'n'], 'Run in non-interactive mode',
     () => yargs
       .option('host', {
