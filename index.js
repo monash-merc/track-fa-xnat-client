@@ -145,16 +145,16 @@ const run = async (options) => {
     console.log(mr_sessions_to_download);
     // Download data
     // create a folder
-    if(!fs.existsSync(`./TRACK_FA_${options.subject}`)){
-      fs.mkdirSync(`./TRACK_FA_${options.subject}`);
+    if(!fs.existsSync(`./download_folder/TRACK_FA_${selectedSubject}`)){
+      fs.mkdirSync(`./download_folder/TRACK_FA_${selectedSubject}`, { recursive: true });
     }
     mr_sessions_to_download.forEach((item) => {
-      if(!fs.existsSync(`./TRACK_FA_${options.subject}/${item.visit}`)) {
-        fs.mkdirSync(`./TRACK_FA_${options.subject}/${item.visit}`);
+      if(!fs.existsSync(`./download_folder/TRACK_FA_${selectedSubject}/${item.visit}`)) {
+        fs.mkdirSync(`./download_folder/TRACK_FA_${selectedSubject}/${item.visit}`, { recursive: true });
       }
       // download data
-      const url = `data/projects/${selectedProject.project}/subjects/${options.subject}/experiments/${item.id}/scans/ALL/files?format=zip`
-      fetchData.download_mr_zip(sessionId, host, url, `./TRACK_FA_${options.subject}/${item.visit}`, `${options.subject}_${item.visit}.zip`).then(
+      const url = `data/projects/${selectedProject.project}/subjects/${selectedSubject}/experiments/${item.id}/scans/ALL/files?format=zip`
+      fetchData.download_mr_zip(sessionId, host, url, `./download_folder/TRACK_FA_${selectedSubject}/${item.visit}`, `${selectedSubject}_${item.visit}.zip`).then(
         //console.log("Files Downloaded");
       )
     })
@@ -266,9 +266,9 @@ const run = async (options) => {
     // downloadStatus.start();
     // eslint-disable-next-line no-restricted-syntax
     // create a directory with TRACKFA_PROC_{pipelineName}
-    const processedDir = `./TRACKFA_PROC_${pipeline.pipeline}`;
+    const processedDir = `./download_folder/TRACKFA_PROC_${pipeline.pipeline}`;
     if (!fs.existsSync(processedDir)) {
-      fs.mkdirSync(processedDir);
+      fs.mkdirSync(processedDir, { recursive: true });
     }
     await downloadFiles(selectedFiles, sessionId, host, processedDir);
     if (mode === 'interactive') {
@@ -282,9 +282,9 @@ const run = async (options) => {
       }));
       selectedFiles.files = filesArray;
     }
-    const preProcessedDir = `./TRACKFA_PREPROC_${pipeline.pipeline}`;
+    const preProcessedDir = `./download_folder/TRACKFA_PREPROC_${pipeline.pipeline}`;
     if (!fs.existsSync(preProcessedDir)) {
-      fs.mkdirSync(preProcessedDir);
+      fs.mkdirSync(preProcessedDir, { recursive: true });
     }
     await downloadFiles(selectedFiles, sessionId, host, preProcessedDir);
     // downloadStatus.stop();
@@ -392,6 +392,7 @@ const run = async (options) => {
     uploadFileList.forEach((file) => {
       const fileSplitArr = file.split('_');
       const fileType = fileSplitArr[2];
+      if (fileType) {
       if (fileType.startsWith('PRO')) {
       // add to processed list
         processedList.push(file);
@@ -399,6 +400,7 @@ const run = async (options) => {
       if (fileType.startsWith('PRE')) {
       // add to pre processed list
         preProcessedList.push(file);
+        }
       }
     });
     console.log(preProcessedList);
