@@ -21,7 +21,7 @@
     "clui": "^0.3.6",
     "configstore": "^5.0.1",
     "eslint": "^7.27.0",
-    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-config-airbnb-base": "^15.0.0",
     "eslint-plugin-import": "^2.23.3",
     "figlet": "^1.5.0",
     "form-data": "^3.0.0",
