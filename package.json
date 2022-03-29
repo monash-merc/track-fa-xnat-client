@@ -27,7 +27,7 @@
     "form-data": "^3.0.0",
     "inquirer": "^8.1.0",
     "lodash": "^4.17.20",
-    "minimist": "^1.2.5",
+    "minimist": "^1.2.6",
     "mz": "^2.7.0",
     "node-fetch": "^2.6.1",
     "simple-git": "^2.34.2",
