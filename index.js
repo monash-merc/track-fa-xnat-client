@@ -81,12 +81,14 @@ async function getSubject(mode, options, sessionId, host, project) {
 
 async function downloadFiles(selectedFiles, sessionId, host, dir) {
   // eslint-disable-next-line no-restricted-syntax
-  for (const file of selectedFiles.files) {
-    // list resources
-    // eslint-disable-next-line no-unused-vars
-    // eslint-disable-next-line no-unused-vars
-    const rsStatus = await fetchData.download_file(sessionId, host, file, dir).then(() => {
-    });
+  if (selectedFiles.hasOwnProperty('files')) {
+    for (const file of selectedFiles.files) {
+      // list resources
+      // eslint-disable-next-line no-unused-vars
+      // eslint-disable-next-line no-unused-vars
+      const rsStatus = await fetchData.download_file(sessionId, host, file, dir).then(() => {
+      });
+    }
   }
 }
 
@@ -315,7 +317,7 @@ const run = async (options) => {
     // downloadStatus.start();
     // eslint-disable-next-line no-restricted-syntax
     // create a directory with TRACKFA_PROC_{pipelineName}
-    const processedDir = `./TRACKFA_PROC_${pipeline.pipeline}`;
+    const processedDir = `.downloads/TRACKFA_PROC_${pipeline.pipeline}`;
     if (!fs.existsSync(processedDir)) {
       fs.mkdirSync(processedDir, { recursive: true });
     }
@@ -335,7 +337,7 @@ const run = async (options) => {
       }));
       selectedFiles.files = filesArray;
     }
-    const preProcessedDir = `./TRACKFA_PREPROC_${pipeline.pipeline}`;
+    const preProcessedDir = `./downloads/TRACKFA_PREPROC_${pipeline.pipeline}`;
     if (!fs.existsSync(preProcessedDir)) {
       fs.mkdirSync(preProcessedDir, { recursive: true });
     }
