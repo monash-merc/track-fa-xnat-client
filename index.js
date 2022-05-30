@@ -191,12 +191,12 @@ const run = async (options) => {
     });
     // Download data
     // create a folder
-    if (!fs.existsSync(`./TRACK_FA_${selectedSubject}`)) {
-      fs.mkdirSync(`./TRACK_FA_${selectedSubject}`, { recursive: true });
+    if (!fs.existsSync(`./downloads/TRACK_FA_${selectedSubject}`)) {
+      fs.mkdirSync(`./downloads/TRACK_FA_${selectedSubject}`, { recursive: true });
     }
     mrSessionsToDownload.forEach((item) => {
-      if (!fs.existsSync(`./TRACK_FA_${selectedSubject}/${item.visit}`)) {
-        fs.mkdirSync(`./TRACK_FA_${selectedSubject}/${item.visit}`, { recursive: true });
+      if (!fs.existsSync(`./downloads/TRACK_FA_${selectedSubject}/${item.visit}`)) {
+        fs.mkdirSync(`./downloads/TRACK_FA_${selectedSubject}/${item.visit}`, { recursive: true });
       }
       // download data
       const url = `data/projects/${selectedProject.project}/subjects/${selectedSubject}/experiments/${item.id}/scans/ALL/files?format=zip`;
@@ -317,7 +317,7 @@ const run = async (options) => {
     // downloadStatus.start();
     // eslint-disable-next-line no-restricted-syntax
     // create a directory with TRACKFA_PROC_{pipelineName}
-    const processedDir = `.downloads/TRACKFA_PROC_${pipeline.pipeline}`;
+    const processedDir = `./downloads/TRACKFA_PROC_${pipeline.pipeline}`;
     if (!fs.existsSync(processedDir)) {
       fs.mkdirSync(processedDir, { recursive: true });
     }
