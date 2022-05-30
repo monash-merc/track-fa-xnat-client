@@ -296,10 +296,10 @@ const run = async (options) => {
     }
 
     // ask resource to Download
-    let selectedFiles = {};
+    let processedSelectedFiles = {};
     if (mode === 'interactive') {
       if (matchedProcessedFiles.length > 0) {
-        selectedFiles = await inquirer.askResourceToDownload(matchedProcessedFiles, 'Processed');
+        processedSelectedFiles = await inquirer.askResourceToDownload(matchedProcessedFiles, 'Processed');
       } else {
         console.log('No matching Processed files found');
       }
@@ -310,21 +310,25 @@ const run = async (options) => {
       matchedProcessedFiles.forEach(((file) => {
         filesArray.push(file.URI);
       }));
-      selectedFiles.files = filesArray;
+      processedSelectedFiles.files = filesArray;
     }
     // download file
     // const downloadStatus = new Spinner('Downloading files, please wait...');
     // downloadStatus.start();
     // eslint-disable-next-line no-restricted-syntax
     // create a directory with TRACKFA_PROC_{pipelineName}
-    const processedDir = `./downloads/TRACKFA_PROC_${pipeline.pipeline}`;
-    if (!fs.existsSync(processedDir)) {
-      fs.mkdirSync(processedDir, { recursive: true });
+    if (JSON.stringify(processedSelectedFiles) !== '{}') {
+      const processedDir = `./downloads/TRACKFA_PROC_${pipeline.pipeline}`;
+      if (!fs.existsSync(processedDir)) {
+        fs.mkdirSync(processedDir, { recursive: true });
+      }
+      await downloadFiles(processedSelectedFiles, sessionId, host, processedDir);
     }
-    await downloadFiles(selectedFiles, sessionId, host, processedDir);
-    if (mode === 'interactive') {
+    
+    let preprocessedSelectedFiles = {};
+    if (mode === 'interactive' && dataType['DataType'].includes('Pre-Processed')) {
       if (matchedPreProcessedFiles.length > 0) {
-        selectedFiles = await inquirer.askResourceToDownload(matchedPreProcessedFiles, 'Pre-Processed');
+        preprocessedSelectedFiles = await inquirer.askResourceToDownload(matchedPreProcessedFiles, 'Pre-Processed');
       } else {
         console.log('No matching PreProcessed files found');
       }
@@ -335,14 +339,16 @@ const run = async (options) => {
       matchedPreProcessedFiles.forEach(((file) => {
         filesArray.push(file.URI);
       }));
-      selectedFiles.files = filesArray;
+      preprocessedSelectedFiles.files = filesArray;
     }
-    const preProcessedDir = `./downloads/TRACKFA_PREPROC_${pipeline.pipeline}`;
-    if (!fs.existsSync(preProcessedDir)) {
-      fs.mkdirSync(preProcessedDir, { recursive: true });
+    if (JSON.stringify(preprocessedSelectedFiles) !== '{}') {
+      const preProcessedDir = `./downloads/TRACKFA_PREPROC_${pipeline.pipeline}`;
+      if (!fs.existsSync(preProcessedDir)) {
+        fs.mkdirSync(preProcessedDir, { recursive: true });
+      }
+      await downloadFiles(preprocessedSelectedFiles, sessionId, host, preProcessedDir);
+      // downloadStatus.stop();
     }
-    await downloadFiles(selectedFiles, sessionId, host, preProcessedDir);
-    // downloadStatus.stop();
     return 0;
   }
   if (methodType.DataType === 'Upload Data') {
