@@ -190,20 +190,24 @@ const run = async (options) => {
       }
     });
     // Download data
-    // create a folder
-    if (!fs.existsSync(`./downloads/TRACK_FA_${selectedSubject}`)) {
-      fs.mkdirSync(`./downloads/TRACK_FA_${selectedSubject}`, { recursive: true });
-    }
-    mrSessionsToDownload.forEach((item) => {
-      if (!fs.existsSync(`./downloads/TRACK_FA_${selectedSubject}/${item.visit}`)) {
-        fs.mkdirSync(`./downloads/TRACK_FA_${selectedSubject}/${item.visit}`, { recursive: true });
+    if (mrSessionsToDownload.length > 0) {
+      // create a folder
+      if (!fs.existsSync(`./downloads/TRACK_FA_${selectedSubject}`)) {
+        fs.mkdirSync(`./downloads/TRACK_FA_${selectedSubject}`, { recursive: true });
       }
-      // download data
-      const url = `data/projects/${selectedProject.project}/subjects/${selectedSubject}/experiments/${item.id}/scans/ALL/files?format=zip`;
-      fetchData.download_mr_zip(sessionId, host, url, `./TRACK_FA_${selectedSubject}/${item.visit}`, `${selectedSubject}_${item.visit}.zip`).then(
-        // console.log("Files Downloaded");
-      );
-    });
+      mrSessionsToDownload.forEach((item) => {
+        if (!fs.existsSync(`./downloads/TRACK_FA_${selectedSubject}/${item.visit}`)) {
+          fs.mkdirSync(`./downloads/TRACK_FA_${selectedSubject}/${item.visit}`, { recursive: true });
+        }
+        // download data
+        const url = `data/projects/${selectedProject.project}/subjects/${selectedSubject}/experiments/${item.id}/scans/ALL/files?format=zip`;
+        fetchData.download_mr_zip(sessionId, host, url, `./downloads/TRACK_FA_${selectedSubject}/${item.visit}`, `${selectedSubject}_${item.visit}.zip`).then(
+          // console.log("Files Downloaded");
+        );
+      });
+    } else {
+      console.log('No matching RAW files found');
+    }
   }
   if (methodType.DataType === 'Download Data' && (options.data_type.includes('Processed') || options.data_type.includes('Pre-Processed'))) {
     // const dataType = await getDataType(mode, options);
