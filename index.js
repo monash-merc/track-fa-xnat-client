@@ -13,7 +13,6 @@ const inquirer = require('./lib/xnat-credentials');
 const fetchData = require('./utils/fetch_data');
 const utils = require('./utils/utils');
 const processedFiles = require('./utils/process_upload');
-const { askAdditionalVisit, askContinue } = require('./lib/xnat-credentials');
 
 const conf = new Configstore('credentials');
 
@@ -81,8 +80,8 @@ async function getSubject(mode, options, sessionId, host, project) {
 }
 
 async function downloadFiles(selectedFiles, sessionId, host, dir) {
-  // eslint-disable-next-line no-restricted-syntax
-  if (selectedFiles.hasOwnProperty('files')) {
+  if (Object.prototype.hasOwnProperty.call(selectedFiles, 'files')) {
+    // eslint-disable-next-line no-restricted-syntax
     for (const file of selectedFiles.files) {
       // list resources
       // eslint-disable-next-line no-unused-vars
@@ -322,8 +321,8 @@ const run = async (options) => {
     // downloadStatus.start();
     // eslint-disable-next-line no-restricted-syntax
     // create a directory with TRACKFA_PROC_{pipelineName}
-    if (processedSelectedFiles.hasOwnProperty('files')) {
-      if (processedSelectedFiles['files'].length > 0) {
+    if (Object.prototype.hasOwnProperty.call(processedSelectedFiles, 'files')) {
+      if (processedSelectedFiles.files.length > 0) {
         const processedDir = `./downloads/TRACKFA_PROC_${pipeline.pipeline}`;
         if (!fs.existsSync(processedDir)) {
           fs.mkdirSync(processedDir, { recursive: true });
@@ -331,9 +330,9 @@ const run = async (options) => {
         await downloadFiles(processedSelectedFiles, sessionId, host, processedDir);
       }
     }
-    
+
     let preprocessedSelectedFiles = {};
-    if (mode === 'interactive' && dataType['DataType'].includes('Pre-Processed')) {
+    if (mode === 'interactive' && dataType.DataType.includes('Pre-Processed')) {
       if (matchedPreProcessedFiles.length > 0) {
         preprocessedSelectedFiles = await inquirer.askResourceToDownload(matchedPreProcessedFiles, 'Pre-Processed');
       } else {
@@ -348,8 +347,8 @@ const run = async (options) => {
       }));
       preprocessedSelectedFiles.files = filesArray;
     }
-    if (preprocessedSelectedFiles.hasOwnProperty('files')) {
-      if (preprocessedSelectedFiles['files'].length > 0) {
+    if (Object.prototype.hasOwnProperty.call(preprocessedSelectedFiles, 'files')) {
+      if (preprocessedSelectedFiles.files.length > 0) {
         const preProcessedDir = `./downloads/TRACKFA_PREPROC_${pipeline.pipeline}`;
         if (!fs.existsSync(preProcessedDir)) {
           fs.mkdirSync(preProcessedDir, { recursive: true });
@@ -572,53 +571,57 @@ const run = async (options) => {
   ---------------------------*/
   if (methodType.DataType === 'Delete Data') {
     // files to delete - resource id
-    let del_file = [];
+    const delFile = [];
 
     // get the project and cycle through all the subjects/experiments/resources
     // and fetch a list of files that matches the pipeline description
     const project = await getProject(mode, options, sessionId, host);
-    const search_status = new Spinner('Searching for files in "' + project.project + '" and files that match: "' + options.pipeline + '"');
-    search_status.start();
+    const searchStatus = new Spinner(`Searching for files in "${project.project}" and files that match: "${options.pipeline}"`);
+    searchStatus.start();
     const allSubjects = await fetchData.get_all_subjects(sessionId, host, project.project);
 
     // get all experiments in subject
-    for (let sub of allSubjects.ResultSet.Result) {
+    // eslint-disable-next-line no-restricted-syntax
+    for (const sub of allSubjects.ResultSet.Result) {
       const allExp = await fetchData.get_all_experiments(sessionId, host, project.project, sub.ID);
 
       // get all resources in experiment
-      for (let exp of allExp.ResultSet.Result) {
-        const resourceFiles = await fetchData.get_resources(sessionId, host, exp.ID)
+      // eslint-disable-next-line no-restricted-syntax
+      for (const exp of allExp.ResultSet.Result) {
+        const resourceFiles = await fetchData.get_resources(sessionId, host, exp.ID);
 
         // search for all files that matches the pipeline in experiment
-        for (let file of resourceFiles.ResultSet.Result) {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const file of resourceFiles.ResultSet.Result) {
           if (file.Name.includes(options.pipeline)) {
             // add this file id to list of files to be deleted
-            del_file.push({'Name': file.Name, 'URI': file.URI});
+            delFile.push({ Name: file.Name, URI: file.URI });
           }
         }
       }
     }
-    search_status.stop();
-    if (del_file.length > 0) {
-      console.log('Found the following files matching "' + options.pipeline + '"');
-      console.log(del_file);
+    searchStatus.stop();
+    if (delFile.length > 0) {
+      console.log(`Found the following files matching "${options.pipeline}"`);
+      console.log(delFile);
       // confirm to delete files
       const userResponse = await inquirer.askDelete();
-      if (userResponse.continue) {  
+      if (userResponse.continue) {
         // delete files
-        const del_status = new Spinner('Deleting files.......');
-        del_status.start();
-        for (let file of del_file) {
+        const delStatus = new Spinner('Deleting files.......');
+        delStatus.start();
+        // eslint-disable-next-line no-restricted-syntax
+        for (const file of delFile) {
           await fetchData.delete_resource(sessionId, host, file.URI);
         }
         await sleep(1000);
         console.log('Files deletion complete.');
-        del_status.stop();
+        delStatus.stop();
       } else {
-        console.log('Delete cancelled, no files were deleted.')
+        console.log('Delete cancelled, no files were deleted.');
       }
     } else {
-      console.log('No files found matching the description: "' + options.pipeline + '"');
+      console.log(`No files found matching the description: "${options.pipeline}"`);
     }
   }
   return 0;
@@ -629,6 +632,7 @@ const options = yargs
   .example(chalk.green('   n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Upload Data" -d "Pre-Processed" "Processed" -o TRACKFA'))
   .example(chalk.yellow('- Download Processed and Pre-Processed data in non-interactive mode:') + chalk.green('\n\t n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Download Data" -d "Processed" "Pre-Processed" -o TRACKFA -P "SpineMorph_SpineT2_SCT_UMN_10Sep2020" -v "01" "02"'))
   .example(chalk.yellow('- Download Raw data in non-interactive mode:') + chalk.green('\n\t n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Download Data" -d "Raw" -s TRACKFA_AAN001 -v "01" -o TRACKFA'))
+  .example(chalk.yellow('- Delete files matching specified pipeline in non-interactive mode:') + chalk.green('\n\t n -h https://xnat.monash.edu/ -u myUserName -p myPassword -m "Delete Data" -o TRACKFA -P "Pipeline_Name_To_Delete"'))
   .command(['interactive', 'i'], 'Run in interactive mode', {}, () => { console.log('Running in interactive mode'); })
   .command(['non-interactive', 'n'], 'Run in non-interactive mode',
     () => yargs
@@ -642,7 +646,7 @@ const options = yargs
         alias: 'p', describe: 'XNAT password', type: 'string', demandOption: true,
       })
       .option('method', {
-        alias: 'm', describe: 'Choose upload or Download', type: 'string', choices: ['Upload Data', 'Download Data', 'Delete Data'], demandOption: true,
+        alias: 'm', describe: 'Choose upload, Download or Delete', type: 'string', choices: ['Upload Data', 'Download Data', 'Delete Data'], demandOption: true,
       })
       .option('data_type', {
         alias: 'd', describe: 'Choose data type', type: 'array', choices: ['Processed', 'Pre-Processed', 'Raw'],

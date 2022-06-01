@@ -4,6 +4,8 @@ const fetch = require('node-fetch');
 const fs = require('fs');
 const FormData = require('form-data');
 const chalk = require('chalk');
+const nodeUrl = require('url');
+const nodePath = require('path');
 
 const { Spinner } = CLI;
 
@@ -217,8 +219,6 @@ module.exports = {
       },
       redirect: 'follow',
     };
-    const nodeUrl = require('url');
-    const nodePath = require('path');
     const urlPath = new nodeUrl.URL(host);
     urlPath.pathname = nodePath.join(uri);
 

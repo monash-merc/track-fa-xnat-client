@@ -22,3 +22,12 @@ This client assumes that the name of the zip file to be uploaded will be in the 
 
 ![](docs/images/download_xnat.gif)
 
+## Deleting Data
+
+Track-FA XNAT client can delete all files for a specific pipeline by running with the following parameters:
+```
+track-fa-xnat-client n -h https://xnat.monash.edu/ -u xnat_username -p xnat_password -m "Delete Data" -o TRACKFA  -P "Matching_Pipeline_Name"
+```
+It will then find all files with the matching pipeline name and list them on screen before confirmation of the delete.
+
+![](docs/images/delete_xnat.png)
