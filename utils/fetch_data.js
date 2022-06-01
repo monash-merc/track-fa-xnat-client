@@ -122,6 +122,22 @@ module.exports = {
       return error;
     }
   },
+  get_all_experiments: async (cookie, host, project, subject) => {
+    const requestOptions = {
+      method: 'GET',
+      headers: {
+        cookie: `JSESSIONID=${cookie}`,
+      },
+      redirect: 'follow',
+    };
+    try {
+      const response = await fetch(`${host}data/projects/${project}/subjects/${subject}/experiments?format=json`, requestOptions);
+      return await response.json();
+    } catch (error) {
+      console.log(error);
+      return error;
+    }
+  },
   create_experiment: async (cookie, host, exp, subject, datatype, selectedProject) => {
     const requestOptions = {
       method: 'PUT',
@@ -188,6 +204,27 @@ module.exports = {
     try {
       const response = await fetch(`${host}data/experiments/${exp}/files`, requestOptions);
       return await response.json();
+    } catch (error) {
+      console.log(error);
+      return error;
+    }
+  },
+  delete_resource: async (cookie, host, uri) => {
+    const requestOptions = {
+      method: 'DELETE',
+      headers: {
+        cookie: `JSESSIONID=${cookie}`,
+      },
+      redirect: 'follow',
+    };
+    const nodeUrl = require('url');
+    const nodePath = require('path');
+    const urlPath = new nodeUrl.URL(host);
+    urlPath.pathname = nodePath.join(uri);
+
+    try {
+      const response = await fetch(urlPath.toString(), requestOptions);
+      return !!response.ok;
     } catch (error) {
       console.log(error);
       return error;

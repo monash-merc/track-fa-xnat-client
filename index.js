@@ -13,6 +13,7 @@ const inquirer = require('./lib/xnat-credentials');
 const fetchData = require('./utils/fetch_data');
 const utils = require('./utils/utils');
 const processedFiles = require('./utils/process_upload');
+const { askAdditionalVisit, askContinue } = require('./lib/xnat-credentials');
 
 const conf = new Configstore('credentials');
 
@@ -566,6 +567,60 @@ const run = async (options) => {
       }
     }
   }
+  /* ------------------------
+    DELETE FILES FROM PROEJCT
+  ---------------------------*/
+  if (methodType.DataType === 'Delete Data') {
+    // files to delete - resource id
+    let del_file = [];
+
+    // get the project and cycle through all the subjects/experiments/resources
+    // and fetch a list of files that matches the pipeline description
+    const project = await getProject(mode, options, sessionId, host);
+    const search_status = new Spinner('Searching for files in "' + project.project + '" and files that match: "' + options.pipeline + '"');
+    search_status.start();
+    const allSubjects = await fetchData.get_all_subjects(sessionId, host, project.project);
+
+    // get all experiments in subject
+    for (let sub of allSubjects.ResultSet.Result) {
+      const allExp = await fetchData.get_all_experiments(sessionId, host, project.project, sub.ID);
+
+      // get all resources in experiment
+      for (let exp of allExp.ResultSet.Result) {
+        const resourceFiles = await fetchData.get_resources(sessionId, host, exp.ID)
+
+        // search for all files that matches the pipeline in experiment
+        for (let file of resourceFiles.ResultSet.Result) {
+          if (file.Name.includes(options.pipeline)) {
+            // add this file id to list of files to be deleted
+            del_file.push({'Name': file.Name, 'URI': file.URI});
+          }
+        }
+      }
+    }
+    search_status.stop();
+    if (del_file.length > 0) {
+      console.log('Found the following files matching "' + options.pipeline + '"');
+      console.log(del_file);
+      // confirm to delete files
+      const userResponse = await inquirer.askDelete();
+      if (userResponse.continue) {  
+        // delete files
+        const del_status = new Spinner('Deleting files.......');
+        del_status.start();
+        for (let file of del_file) {
+          await fetchData.delete_resource(sessionId, host, file.URI);
+        }
+        await sleep(1000);
+        console.log('Files deletion complete.');
+        del_status.stop();
+      } else {
+        console.log('Delete cancelled, no files were deleted.')
+      }
+    } else {
+      console.log('No files found matching the description: "' + options.pipeline + '"');
+    }
+  }
   return 0;
 };
 const options = yargs
@@ -587,10 +642,10 @@ const options = yargs
         alias: 'p', describe: 'XNAT password', type: 'string', demandOption: true,
       })
       .option('method', {
-        alias: 'm', describe: 'Choose upload or Download', type: 'string', choices: ['Upload Data', 'Download Data'], demandOption: true,
+        alias: 'm', describe: 'Choose upload or Download', type: 'string', choices: ['Upload Data', 'Download Data', 'Delete Data'], demandOption: true,
       })
       .option('data_type', {
-        alias: 'd', describe: 'Choose data type', type: 'array', choices: ['Processed', 'Pre-Processed', 'Raw'], demandOption: true,
+        alias: 'd', describe: 'Choose data type', type: 'array', choices: ['Processed', 'Pre-Processed', 'Raw'],
       })
       .option('project', {
         alias: 'o', describe: 'Choose project', type: 'string', demandOption: true,
