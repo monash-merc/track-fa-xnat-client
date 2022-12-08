@@ -16,7 +16,7 @@
     "@octokit/rest": "^18.1.0",
     "adm-zip": "^0.5.5",
     "axios": "^0.21.1",
-    "chalk": "^4.1.0",
+    "chalk": "^5.2.0",
     "clear": "^0.1.0",
     "clui": "^0.3.6",
     "configstore": "^5.0.1",
